@@ -14,13 +14,17 @@ static mut HAD_ERROR: bool = false;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() > 2 {
-        println!("Usage: rlox [script]");
-        std::process::exit(64);
-    } else if args.len() == 2 {
-        run_file(&args[1]);
-    } else {
-        run_prompt();
+    match args.len() {
+        n if n > 2 => {
+            println!("Usage: rlox [script]");
+            std::process::exit(64);
+        }
+        2 => {
+            run_file(&args[1]);
+        }
+        _ => {
+            run_prompt();
+        }
     }
 }
 
@@ -37,7 +41,7 @@ fn run_prompt() {
     loop {
         print!("> ");
         io::stdout().lock().flush().unwrap();
-        if let Ok(_) = stdin.lock().read_line(&mut buf) {
+        if stdin.lock().read_line(&mut buf).is_ok() {
             run(&buf);
             unsafe {
                 HAD_ERROR = false;

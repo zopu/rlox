@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::LinkedList;
 
-use crate::tokens::{Token, TokenType};
+use crate::tokens::{Token, TokenLiteral, TokenType};
 
 pub struct Scanner {
     source: Vec<char>,
@@ -28,8 +28,12 @@ impl Scanner {
             self.scan_token();
         }
 
-        self.tokens
-            .push_back(Token::new(TokenType::Eof, "".to_string(), None, self.line));
+        self.tokens.push_back(Token::new(
+            TokenType::Eof,
+            "".to_string(),
+            TokenLiteral::None,
+            self.line,
+        ));
         &self.tokens
     }
 
@@ -96,10 +100,33 @@ impl Scanner {
             '"' => {
                 self.scan_string();
             }
+
+            c if is_digit(c) => {
+                self.scan_number();
+            }
             _ => {
                 panic!("Unexpected token at line {}", self.line);
             }
         }
+    }
+
+    fn scan_number(&mut self) {
+        while is_digit(self.peek()) {
+            self.advance();
+        }
+        // Look for a fractional/decimal part
+        if self.peek() == '.' && is_digit(self.peek_next()) {
+            // Consume the '.'
+            self.advance();
+        }
+        while is_digit(self.peek()) {
+            self.advance();
+        }
+
+        // Parse numbers as f64
+        let num_string: String = self.source[self.start..self.current].iter().collect();
+        let num: f64 = num_string.parse().unwrap();
+        self.add_token_with_literal(TokenType::Number, TokenLiteral::Number(num));
     }
 
     fn scan_string(&mut self) {
@@ -121,7 +148,7 @@ impl Scanner {
         let value: String = self.source[self.start + 1..self.current - 1]
             .iter()
             .collect();
-        self.add_token_with_literal(TokenType::String, Some(value));
+        self.add_token_with_literal(TokenType::String, TokenLiteral::String(value));
     }
 
     fn is_at_end(&self) -> bool {
@@ -135,10 +162,10 @@ impl Scanner {
     }
 
     fn add_token(&mut self, t: TokenType) {
-        self.add_token_with_literal(t, None);
+        self.add_token_with_literal(t, TokenLiteral::None);
     }
 
-    fn add_token_with_literal(&mut self, t: TokenType, literal: Option<String>) {
+    fn add_token_with_literal(&mut self, t: TokenType, literal: TokenLiteral) {
         let text: String = self.source[self.start..self.current].iter().collect();
         // println!("Adding token {}: {}", t.to_string(), text);
         self.tokens
@@ -163,4 +190,15 @@ impl Scanner {
         }
         self.source[self.current]
     }
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            return '\0';
+        }
+        self.source[self.current + 1]
+    }
+}
+
+fn is_digit(c: char) -> bool {
+    c >= '0' && c <= '9'
 }
