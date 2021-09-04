@@ -1,70 +1,87 @@
 use std::fmt;
 
+#[derive(Clone, Debug, strum_macros::ToString)]
 pub enum TokenType {
     // Single-character tokens
-    LEFT_PAREN,
-    RIGHT_PAREN,
-    LEFT_BRACE,
-    RIGHT_BRACE,
-    COMMA,
-    DOT,
-    MINUS,
-    PLUS,
-    SEMICOLON,
-    SLASH,
-    STAR,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    SemiColon,
+    Slash,
+    Star,
 
     // One or two character tokens
-    BANG,
-    BANG_EQUAL,
-    EQUAL,
-    EQUAL_EQUAL,
-    GREATER,
-    GREATER_EQUAL,
-    LESS,
-    LESS_EQUAL,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
 
     // Identifiers
-    IDENTIFIER,
-    STRING,
-    NUMBER,
+    Identifier,
+    String,
+    Number,
 
     // Keywords
-    AND,
-    BLASS,
-    ELSE,
-    FALSE,
-    FUN,
-    FOR,
-    IF,
-    NIL,
-    OR,
-    PRINT,
-    RETURN,
-    SUPER,
-    THIS,
-    TRUE,
-    VAR,
-    WHILE,
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 
-    EOF,
+    Eof,
 }
 
-#[derive(Debug)]
-struct Token {
+#[derive(Clone, Debug)]
+pub struct Token {
     token_type: TokenType,
     lexeme: String,
-    // TODO: literal
-    line: u32,
+    literal: Option<String>,
+    line: usize,
+}
+
+impl Token {
+    pub fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<String>,
+        line: usize,
+    ) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            literal,
+            line,
+        }
+    }
 }
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.token_type);
-        f.write_str(" ");
-        f.write_str(&self.lexeme);
-        f.write_str(" ");
+        f.write_str(&self.token_type.to_string())?;
+        f.write_str(" ")?;
+        f.write_str(&self.lexeme)?;
+        f.write_str(" ")?;
         // f.write_str(&self.literal);
-        Ok()
+        Ok(())
     }
 }

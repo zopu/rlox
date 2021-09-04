@@ -1,8 +1,14 @@
 use std::collections::LinkedList;
+use std::env;
 use std::io;
 use std::io::BufRead;
 use std::io::Write;
-use std::env;
+
+mod scanner;
+mod tokens;
+
+use scanner::Scanner;
+use tokens::Token;
 
 static mut HAD_ERROR: bool = false;
 
@@ -27,7 +33,7 @@ fn run_file(filename: &str) {
 fn run_prompt() {
     let stdin = io::stdin();
     let mut buf = String::new();
-    
+
     loop {
         print!("> ");
         io::stdout().lock().flush().unwrap();
@@ -36,13 +42,14 @@ fn run_prompt() {
             unsafe {
                 HAD_ERROR = false;
             }
+            buf.clear();
         }
     }
 }
 
 fn run(code: &str) {
-    let scanner: Scanner = Scanner::new(code);
-    let tokens: LinkedList<Token> = scanner.scan_tokens();
+    let mut scanner: Scanner = Scanner::new(code);
+    let tokens: &LinkedList<Token> = scanner.scan_tokens();
 
     for t in tokens {
         println!("Token: {:?}", t)
@@ -61,21 +68,4 @@ fn error(line: u32, message: &str) {
 
 fn report(line: u32, location: &str, msg: &str) {
     println!("[line {}] Error {}: {}", line, location, msg);
-}
-
-struct Scanner {
-}
-
-impl Scanner {
-    pub fn new(_src: &str) -> Self {
-        Scanner {}
-    }
-
-    pub fn scan_tokens(&self) -> LinkedList<Token> {
-        return LinkedList::new();
-    }
-}
-
-#[derive(Debug)]
-struct Token {
 }
