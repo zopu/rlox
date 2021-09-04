@@ -1,4 +1,5 @@
 use core::panic;
+use std::collections::HashMap;
 use std::collections::LinkedList;
 
 use crate::tokens::{Token, TokenLiteral, TokenType};
@@ -9,16 +10,36 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+    kw_map: HashMap<String, TokenType>,
 }
 
 impl Scanner {
     pub fn new(src: &str) -> Self {
+        let mut kw_map: HashMap<String, TokenType> = HashMap::new();
+        kw_map.insert("and".to_string(), TokenType::And);
+        kw_map.insert("class".to_string(), TokenType::Class);
+        kw_map.insert("else".to_string(), TokenType::Else);
+        kw_map.insert("false".to_string(), TokenType::False);
+        kw_map.insert("for".to_string(), TokenType::For);
+        kw_map.insert("fun".to_string(), TokenType::Fun);
+        kw_map.insert("if".to_string(), TokenType::If);
+        kw_map.insert("nil".to_string(), TokenType::Nil);
+        kw_map.insert("or".to_string(), TokenType::Or);
+        kw_map.insert("print".to_string(), TokenType::Print);
+        kw_map.insert("return".to_string(), TokenType::Return);
+        kw_map.insert("super".to_string(), TokenType::Super);
+        kw_map.insert("this".to_string(), TokenType::This);
+        kw_map.insert("true".to_string(), TokenType::True);
+        kw_map.insert("var".to_string(), TokenType::Var);
+        kw_map.insert("while".to_string(), TokenType::While);
+
         Scanner {
             source: src.chars().collect(),
             tokens: LinkedList::new(),
             start: 0,
             current: 0,
             line: 1,
+            kw_map,
         }
     }
 
@@ -104,10 +125,27 @@ impl Scanner {
             c if is_digit(c) => {
                 self.scan_number();
             }
+            c if is_alpha(c) => {
+                self.scan_identifier();
+            }
+
             _ => {
                 panic!("Unexpected token at line {}", self.line);
             }
         }
+    }
+
+    fn scan_identifier(&mut self) {
+        while is_alphanumeric(self.peek()) {
+            self.advance();
+        }
+        let text: String = self.source[self.start..self.current].iter().collect();
+        let token_type = self
+            .kw_map
+            .get(&text)
+            .cloned()
+            .unwrap_or(TokenType::Identifier);
+        self.add_token(token_type);
     }
 
     fn scan_number(&mut self) {
@@ -201,4 +239,12 @@ impl Scanner {
 
 fn is_digit(c: char) -> bool {
     c >= '0' && c <= '9'
+}
+
+fn is_alpha(c: char) -> bool {
+    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+fn is_alphanumeric(c: char) -> bool {
+    is_alpha(c) || is_digit(c)
 }
