@@ -4,6 +4,8 @@ use std::io::BufRead;
 use std::io::Write;
 use std::env;
 
+static mut HAD_ERROR: bool = false;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 2 {
@@ -31,6 +33,9 @@ fn run_prompt() {
         io::stdout().lock().flush().unwrap();
         if let Ok(_) = stdin.lock().read_line(&mut buf) {
             run(&buf);
+            unsafe {
+                HAD_ERROR = false;
+            }
         }
     }
 }
@@ -42,6 +47,20 @@ fn run(code: &str) {
     for t in tokens {
         println!("Token: {:?}", t)
     }
+
+    unsafe {
+        if HAD_ERROR {
+            std::process::exit(65)
+        }
+    }
+}
+
+fn error(line: u32, message: &str) {
+    report(line, "", message);
+}
+
+fn report(line: u32, location: &str, msg: &str) {
+    println!("[line {}] Error {}: {}", line, location, msg);
 }
 
 struct Scanner {
