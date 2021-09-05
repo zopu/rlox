@@ -48,3 +48,27 @@ impl PrettyPrinter {
         s
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::tokens::{Token, TokenLiteral, TokenType};
+
+    #[test]
+    pub fn can_pretty_print() {
+        let e = Expr::Binary(BinaryExpr {
+            left: Box::new(Expr::Literal(TokenLiteral::Number(1.23))),
+            operator: Token {
+                token_type: TokenType::Plus,
+                lexeme: "+".to_string(),
+                literal: TokenLiteral::None,
+                line: 1,
+            },
+            right: Box::new(Expr::Literal(TokenLiteral::Number(4.5))),
+        });
+
+        let pp = PrettyPrinter {};
+        let s = pp.print(&e);
+        println!("AST: {}", s);
+    }
+}
