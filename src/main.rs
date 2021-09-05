@@ -4,6 +4,8 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
+mod expr;
+mod expr2;
 mod scanner;
 mod tokens;
 
@@ -13,6 +15,40 @@ use tokens::Token;
 static mut HAD_ERROR: bool = false;
 
 fn main() {
+    let e2 = expr2::BinaryExpr {
+        left: Box::new(expr2::Expr::LiteralExpr(expr2::LiteralExpr {
+            literal: tokens::TokenLiteral::Number(1.23),
+        })),
+        operator: tokens::Token {
+            token_type: tokens::TokenType::Plus,
+            lexeme: "+".to_string(),
+            literal: tokens::TokenLiteral::None,
+            line: 1,
+        },
+        right: Box::new(expr2::Expr::LiteralExpr(expr2::LiteralExpr {
+            literal: tokens::TokenLiteral::Number(4.5),
+        })),
+    };
+
+    let mut pp2 = expr2::PrettyPrinter {};
+    let s2 = pp2.print(&e2);
+    println!("AST: {}", s2);
+
+    let e = expr::Expr::Binary(expr::BinaryExpr {
+        left: Box::new(expr::Expr::Literal(tokens::TokenLiteral::Number(1.23))),
+        operator: tokens::Token {
+            token_type: tokens::TokenType::Plus,
+            lexeme: "+".to_string(),
+            literal: tokens::TokenLiteral::None,
+            line: 1,
+        },
+        right: Box::new(expr::Expr::Literal(tokens::TokenLiteral::Number(4.5))),
+    });
+
+    let pp = expr::PrettyPrinter {};
+    let s = pp.print(&e);
+    println!("AST: {}", s);
+
     let args: Vec<String> = env::args().collect();
     match args.len() {
         n if n > 2 => {
