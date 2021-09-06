@@ -68,10 +68,12 @@ impl<'a> Scanner<'a> {
             ')' => self.add_token(TokenType::RightParen),
             '[' => self.add_token(TokenType::LeftBrace),
             ']' => self.add_token(TokenType::RightBrace),
+            ':' => self.add_token(TokenType::Colon),
             ',' => self.add_token(TokenType::Comma),
             '.' => self.add_token(TokenType::Dot),
             '-' => self.add_token(TokenType::Minus),
             '+' => self.add_token(TokenType::Plus),
+            '?' => self.add_token(TokenType::QuestionMark),
             ';' => self.add_token(TokenType::SemiColon),
             '*' => self.add_token(TokenType::Star),
 

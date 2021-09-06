@@ -13,6 +13,9 @@ pub enum ParseError {
 
     #[error("Expect expression")]
     ExpressionExpected,
+
+    #[error("Expect ':' in ternary operator")]
+    ColonExpectedInTernary,
 }
 
 pub struct Parser<'a> {
@@ -38,14 +41,35 @@ impl<'a> Parser<'a> {
     }
 
     fn expression_list(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.expression()?;
+        let mut expr = self.ternary_conditional()?;
         while self.match_any(&[TokenType::Comma]) {
             let operator = self.previous();
-            let right = Box::new(self.expression_list()?);
+            let right = Box::new(self.ternary_conditional()?);
             expr = Expr::Binary(BinaryExpr {
                 left: Box::new(expr),
                 operator,
                 right,
+            });
+        }
+        Ok(expr)
+    }
+
+    fn ternary_conditional(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.expression()?;
+        while self.match_any(&[TokenType::QuestionMark]) {
+            let operator = self.previous();
+            let true_expr = self.expression()?;
+            let colon_op = self.consume(TokenType::Colon, ParseError::ColonExpectedInTernary)?;
+            let false_expr = self.expression()?;
+            let expr_options = Expr::Binary(BinaryExpr {
+                left: Box::new(true_expr),
+                operator: colon_op,
+                right: Box::new(false_expr),
+            });
+            expr = Expr::Binary(BinaryExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(expr_options),
             });
         }
         Ok(expr)
