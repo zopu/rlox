@@ -5,6 +5,7 @@ use std::io::BufRead;
 use std::io::Write;
 
 mod expr;
+mod interpreter;
 mod parser;
 mod scanner;
 mod tokens;
@@ -13,6 +14,7 @@ use scanner::Scanner;
 use tokens::Token;
 
 use crate::expr::PrettyPrinter;
+use crate::interpreter::LoxValue;
 
 mod errors {
     use crate::tokens::{Token, TokenType};
@@ -20,12 +22,14 @@ mod errors {
 
     pub struct ErrorReporter {
         had_error: RefCell<bool>,
+        had_runtime_error: RefCell<bool>,
     }
 
     impl ErrorReporter {
         pub fn new() -> ErrorReporter {
             ErrorReporter {
                 had_error: RefCell::new(false),
+                had_runtime_error: RefCell::new(false),
             }
         }
 
@@ -44,6 +48,11 @@ mod errors {
             }
         }
 
+        pub fn runtime_error(&self, msg: &str) {
+            self.had_runtime_error.replace(true);
+            println!("Runtime Error: {}", msg);
+        }
+
         pub fn report(&self, line: usize, location: &str, msg: &str) {
             self.had_error.replace(true);
             println!("[line {}] Error {}: {}", line, location, msg);
@@ -53,8 +62,13 @@ mod errors {
             *self.had_error.borrow()
         }
 
+        pub fn had_runtime_error(&self) -> bool {
+            *self.had_runtime_error.borrow()
+        }
+
         pub fn reset(&mut self) {
             self.had_error.replace(false);
+            self.had_runtime_error.replace(false);
         }
     }
 }
@@ -83,6 +97,9 @@ fn run_file(filename: &str) {
     if error_reporter.had_error() {
         std::process::exit(65);
     }
+    if error_reporter.had_runtime_error() {
+        std::process::exit(70);
+    }
 }
 
 fn run_prompt() {
@@ -105,18 +122,22 @@ fn run(code: &str, error_reporter: &errors::ErrorReporter) {
     let scanner: Scanner = Scanner::new(code, error_reporter);
     let tokens: LinkedList<Token> = scanner.scan_tokens();
 
-    for t in &tokens {
-        println!("Token: {:?}", t);
-    }
+    // for t in &tokens {
+    //     println!("Token: {:?}", t);
+    // }
 
     let mut parser = parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
-    let result = parser.parse();
+    let ast = parser.parse().unwrap_or_else(expr::nil);
 
     if error_reporter.had_error() {
         return;
     }
 
     let pp = PrettyPrinter {};
-    let s = pp.print(&result.unwrap_or(expr::nil()));
+    let s = pp.print(&ast);
     println!("Parsed: {:?}", s);
+
+    let interpreter = interpreter::Interpreter::new(error_reporter);
+    let val = interpreter.interpret(&ast).unwrap_or(LoxValue::Nil);
+    println!("{}", val);
 }

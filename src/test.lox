@@ -2,4 +2,5 @@
 Multi
 line
 1.23
-comment */ nil
+comment */
+1 + (2 * 6)
