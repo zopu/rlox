@@ -48,9 +48,9 @@ mod errors {
             }
         }
 
-        pub fn runtime_error(&self, msg: &str) {
+        pub fn runtime_error(&self, line: usize, msg: &str) {
             self.had_runtime_error.replace(true);
-            println!("Runtime Error: {}", msg);
+            println!("[Line {}] Runtime Error: {}", line, msg);
         }
 
         pub fn report(&self, line: usize, location: &str, msg: &str) {

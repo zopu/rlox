@@ -144,20 +144,25 @@ impl<'a> Interpreter<'a> {
             (TokenType::EqualEqual, left, right) => Ok(LoxValue::Boolean(left == right)),
 
             // Handle invalid cases
-            (TokenType::Minus, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            (TokenType::Slash, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            (TokenType::Star, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            (TokenType::Plus, _, _) => self.error(RuntimeError::PlusOperandsWrong),
-            (TokenType::Greater, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            (TokenType::GreaterEqual, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            (TokenType::Less, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            (TokenType::LessEqual, _, _) => self.error(RuntimeError::OperandsMustBeNumbers),
-            _ => self.error(RuntimeError::UnsupportedOperation),
+            (TokenType::Minus, _, _) => self.error(operator, RuntimeError::OperandsMustBeNumbers),
+            (TokenType::Slash, _, _) => self.error(operator, RuntimeError::OperandsMustBeNumbers),
+            (TokenType::Star, _, _) => self.error(operator, RuntimeError::OperandsMustBeNumbers),
+            (TokenType::Plus, _, _) => self.error(operator, RuntimeError::PlusOperandsWrong),
+            (TokenType::Greater, _, _) => self.error(operator, RuntimeError::OperandsMustBeNumbers),
+            (TokenType::GreaterEqual, _, _) => {
+                self.error(operator, RuntimeError::OperandsMustBeNumbers)
+            }
+            (TokenType::Less, _, _) => self.error(operator, RuntimeError::OperandsMustBeNumbers),
+            (TokenType::LessEqual, _, _) => {
+                self.error(operator, RuntimeError::OperandsMustBeNumbers)
+            }
+            _ => self.error(operator, RuntimeError::UnsupportedOperation),
         }
     }
 
-    fn error(&self, error: RuntimeError) -> Result<LoxValue, RuntimeError> {
-        self.error_reporter.runtime_error(&error.to_string());
+    fn error(&self, token: &Token, error: RuntimeError) -> Result<LoxValue, RuntimeError> {
+        self.error_reporter
+            .runtime_error(token.line, &error.to_string());
         Err(error)
     }
 }
