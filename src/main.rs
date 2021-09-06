@@ -12,8 +12,6 @@ mod tokens;
 use scanner::Scanner;
 use tokens::Token;
 
-static mut HAD_ERROR: bool = false;
-
 mod errors {
     use crate::tokens::{Token, TokenType};
     use std::cell::RefCell;
@@ -52,6 +50,10 @@ mod errors {
         pub fn had_error(&self) -> bool {
             *self.had_error.borrow()
         }
+
+        pub fn reset(&mut self) {
+            self.had_error.replace(false);
+        }
     }
 }
 
@@ -74,43 +76,42 @@ fn main() {
 fn run_file(filename: &str) {
     println!("running file {:?}", filename);
     let contents = std::fs::read_to_string(filename).expect("Could not read input file");
-    run(&contents);
+    let error_reporter = errors::ErrorReporter::new();
+    run(&contents, &error_reporter);
+    if error_reporter.had_error() {
+        std::process::exit(65);
+    }
 }
 
 fn run_prompt() {
     let stdin = io::stdin();
     let mut buf = String::new();
+    let mut error_reporter = errors::ErrorReporter::new();
 
     loop {
         print!("> ");
         io::stdout().lock().flush().unwrap();
         if stdin.lock().read_line(&mut buf).is_ok() {
-            run(&buf);
-            unsafe {
-                HAD_ERROR = false;
-            }
+            run(&buf, &error_reporter);
+            error_reporter.reset();
             buf.clear();
         }
     }
 }
 
-fn run(code: &str) {
-    let scanner: Scanner = Scanner::new(code);
+fn run(code: &str, error_reporter: &errors::ErrorReporter) {
+    let scanner: Scanner = Scanner::new(code, error_reporter);
     let tokens: LinkedList<Token> = scanner.scan_tokens();
 
     for t in &tokens {
-        println!("Token: {:?}", t)
+        println!("Token: {:?}", t);
     }
-
-    unsafe {
-        if HAD_ERROR {
-            std::process::exit(65)
-        }
-    }
-    let error_reporter = errors::ErrorReporter::new();
 
     let mut parser = parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
-
     let result = parser.parse();
+
+    if error_reporter.had_error() {
+        return;
+    }
     println!("Parsed: {:?}", result);
 }

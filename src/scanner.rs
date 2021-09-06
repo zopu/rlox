@@ -1,20 +1,21 @@
-use core::panic;
 use std::collections::HashMap;
 use std::collections::LinkedList;
 
+use crate::errors::ErrorReporter;
 use crate::tokens::{Token, TokenLiteral, TokenType};
 
-pub struct Scanner {
+pub struct Scanner<'a> {
     source: Vec<char>,
     tokens: LinkedList<Token>,
     start: usize,
     current: usize,
     line: usize,
     kw_map: HashMap<String, TokenType>,
+    error_reporter: &'a ErrorReporter,
 }
 
-impl Scanner {
-    pub fn new(src: &str) -> Self {
+impl<'a> Scanner<'a> {
+    pub fn new(src: &str, error_reporter: &'a ErrorReporter) -> Self {
         let mut kw_map: HashMap<String, TokenType> = HashMap::new();
         kw_map.insert("and".to_string(), TokenType::And);
         kw_map.insert("class".to_string(), TokenType::Class);
@@ -40,6 +41,7 @@ impl Scanner {
             current: 0,
             line: 1,
             kw_map,
+            error_reporter,
         }
     }
 
@@ -117,7 +119,8 @@ impl Scanner {
                         self.advance();
                     }
                     if self.is_at_end() {
-                        panic!("Unterminated multi-line comment on line {}", start_line);
+                        self.error_reporter
+                            .error(start_line, "Unterminated multi-line comment on line {}");
                     }
                     // Consume the closing */
                     self.advance();
@@ -145,7 +148,8 @@ impl Scanner {
             }
 
             _ => {
-                panic!("Unexpected token at line {}", self.line);
+                self.error_reporter
+                    .error(self.line, "Unexpected token at line {}");
             }
         }
     }
@@ -191,7 +195,8 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            panic!("Unterminated string on line {}", self.line);
+            self.error_reporter
+                .error(self.line, "Unterminated string on line {}");
         }
 
         // Consume the closing "
