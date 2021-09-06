@@ -43,7 +43,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> &LinkedList<Token> {
+    pub fn scan_tokens(mut self) -> LinkedList<Token> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
@@ -55,7 +55,7 @@ impl Scanner {
             TokenLiteral::None,
             self.line,
         ));
-        &self.tokens
+        self.tokens
     }
 
     fn scan_token(&mut self) {

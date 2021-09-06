@@ -5,6 +5,7 @@ use std::io::BufRead;
 use std::io::Write;
 
 mod expr;
+mod parser;
 mod scanner;
 mod tokens;
 
@@ -12,6 +13,47 @@ use scanner::Scanner;
 use tokens::Token;
 
 static mut HAD_ERROR: bool = false;
+
+mod errors {
+    use crate::tokens::{Token, TokenType};
+    use std::cell::RefCell;
+
+    pub struct ErrorReporter {
+        had_error: RefCell<bool>,
+    }
+
+    impl ErrorReporter {
+        pub fn new() -> ErrorReporter {
+            ErrorReporter {
+                had_error: RefCell::new(false),
+            }
+        }
+
+        pub fn error(&self, line: usize, message: &str) {
+            self.report(line, "", message);
+        }
+
+        pub fn token_error(&self, t: Token, msg: &str) {
+            if let TokenType::Eof = t.token_type {
+                self.report(t.line, " at end", msg);
+            } else {
+                let mut location: String = " at '".to_string();
+                location.push_str(&t.lexeme);
+                location.push_str("'");
+                self.report(t.line, " at ", msg);
+            }
+        }
+
+        pub fn report(&self, line: usize, location: &str, msg: &str) {
+            self.had_error.replace(true);
+            println!("[line {}] Error {}: {}", line, location, msg);
+        }
+
+        pub fn had_error(&self) -> bool {
+            *self.had_error.borrow()
+        }
+    }
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -53,10 +95,10 @@ fn run_prompt() {
 }
 
 fn run(code: &str) {
-    let mut scanner: Scanner = Scanner::new(code);
-    let tokens: &LinkedList<Token> = scanner.scan_tokens();
+    let scanner: Scanner = Scanner::new(code);
+    let tokens: LinkedList<Token> = scanner.scan_tokens();
 
-    for t in tokens {
+    for t in &tokens {
         println!("Token: {:?}", t)
     }
 
@@ -65,12 +107,10 @@ fn run(code: &str) {
             std::process::exit(65)
         }
     }
-}
+    let error_reporter = errors::ErrorReporter::new();
 
-fn error(line: u32, message: &str) {
-    report(line, "", message);
-}
+    let mut parser = parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
 
-fn report(line: u32, location: &str, msg: &str) {
-    println!("[line {}] Error {}: {}", line, location, msg);
+    let result = parser.parse();
+    println!("Parsed: {:?}", result);
 }

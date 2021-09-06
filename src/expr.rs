@@ -1,5 +1,6 @@
 use crate::tokens::{Token, TokenLiteral};
 
+#[derive(Debug)]
 pub enum Expr {
     Binary(BinaryExpr),
     Grouping(Box<Expr>),
@@ -7,12 +8,14 @@ pub enum Expr {
     Unary(UnaryExpr),
 }
 
+#[derive(Debug)]
 pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
+#[derive(Debug)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub right: Box<Expr>,
@@ -30,6 +33,9 @@ impl PrettyPrinter {
             }
             Expr::Literal(token_literal) => match token_literal {
                 TokenLiteral::None => "nil".to_string(),
+                TokenLiteral::True => "true".to_string(),
+                TokenLiteral::False => "false".to_string(),
+                TokenLiteral::Nil => "nil".to_string(),
                 TokenLiteral::String(s) => s.clone(),
                 TokenLiteral::Number(n) => n.to_string(),
             },
