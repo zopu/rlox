@@ -63,7 +63,7 @@ pub enum RuntimeError {
     #[error("Operands must be numbers")]
     OperandsMustBeNumbers,
 
-    #[error("Operands for '+' must both be numbers or both be strings")]
+    #[error("Operands for '+' must be numbers, or first operand must be a string")]
     PlusOperandsWrong,
 
     #[error("Unsupported operation")]
@@ -126,6 +126,12 @@ impl<'a> Interpreter<'a> {
                 let mut s = String::new();
                 s.push_str(&sl);
                 s.push_str(&sr);
+                Ok(LoxValue::String(s))
+            }
+            (TokenType::Plus, &LoxValue::String(sl), &non_string) => {
+                let mut s = String::new();
+                s.push_str(&sl);
+                s.push_str(&non_string.to_string());
                 Ok(LoxValue::String(s))
             }
             (TokenType::Greater, &LoxValue::Number(nl), &LoxValue::Number(nr)) => {
