@@ -21,6 +21,10 @@ pub struct UnaryExpr {
     pub right: Box<Expr>,
 }
 
+pub fn nil() -> Expr {
+    Expr::Literal(TokenLiteral::Nil)
+}
+
 pub struct PrettyPrinter {}
 
 impl PrettyPrinter {

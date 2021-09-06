@@ -12,6 +12,8 @@ mod tokens;
 use scanner::Scanner;
 use tokens::Token;
 
+use crate::expr::PrettyPrinter;
+
 mod errors {
     use crate::tokens::{Token, TokenType};
     use std::cell::RefCell;
@@ -113,5 +115,8 @@ fn run(code: &str, error_reporter: &errors::ErrorReporter) {
     if error_reporter.had_error() {
         return;
     }
-    println!("Parsed: {:?}", result);
+
+    let pp = PrettyPrinter {};
+    let s = pp.print(&result.unwrap_or(expr::nil()));
+    println!("Parsed: {:?}", s);
 }

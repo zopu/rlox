@@ -31,10 +31,24 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Option<Expr> {
-        match self.expression() {
+        match self.expression_list() {
             Ok(expr) => Some(expr),
             Err(_) => None,
         }
+    }
+
+    fn expression_list(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.expression()?;
+        while self.match_any(&[TokenType::Comma]) {
+            let operator = self.previous();
+            let right = Box::new(self.expression_list()?);
+            expr = Expr::Binary(BinaryExpr {
+                left: Box::new(expr),
+                operator,
+                right,
+            });
+        }
+        Ok(expr)
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
