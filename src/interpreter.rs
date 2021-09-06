@@ -68,6 +68,9 @@ pub enum RuntimeError {
 
     #[error("Unsupported operation")]
     UnsupportedOperation,
+
+    #[error("Attempted to divide by zero")]
+    DivideByZero,
 }
 
 pub struct Interpreter<'a> {
@@ -114,7 +117,11 @@ impl<'a> Interpreter<'a> {
                 Ok(LoxValue::Number(nl - nr))
             }
             (TokenType::Slash, &LoxValue::Number(nl), &LoxValue::Number(nr)) => {
-                Ok(LoxValue::Number(nl / nr))
+                if *nr == 0.0 {
+                    self.error(operator, RuntimeError::DivideByZero)
+                } else {
+                    Ok(LoxValue::Number(nl / nr))
+                }
             }
             (TokenType::Star, &LoxValue::Number(nl), &LoxValue::Number(nr)) => {
                 Ok(LoxValue::Number(nl * nr))
