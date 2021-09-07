@@ -1,8 +1,9 @@
 use std::collections::LinkedList;
-use std::env;
 use std::io;
 use std::io::BufRead;
 use std::io::Write;
+
+use clap::{App, Arg};
 
 mod expr;
 mod interpreter;
@@ -73,26 +74,29 @@ mod errors {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    match args.len() {
-        n if n > 2 => {
-            println!("Usage: rlox [script]");
-            std::process::exit(64);
-        }
-        2 => {
-            run_file(&args[1]);
-        }
-        _ => {
-            run_prompt();
-        }
+
+    let matches = App::new("rlox")
+        .version("0.1")
+        .arg(Arg::with_name("verbose")
+            .short("V")
+            .long("verbose")
+            .help("Verbose output"))
+        .arg(Arg::with_name("FILE"))
+        .get_matches();
+    
+    let verbose = matches.is_present("verbose");
+    if let Some(f) = matches.value_of("FILE") {
+        run_file(&f, verbose);
+        return;
     }
+    run_prompt(verbose);
 }
 
-fn run_file(filename: &str) {
+fn run_file(filename: &str, verbose: bool) {
     println!("running file {:?}", filename);
     let contents = std::fs::read_to_string(filename).expect("Could not read input file");
     let error_reporter = errors::ErrorReporter::new();
-    run(&contents, &error_reporter);
+    run(&contents, verbose, &error_reporter);
     if error_reporter.had_error() {
         std::process::exit(65);
     }
@@ -101,7 +105,7 @@ fn run_file(filename: &str) {
     }
 }
 
-fn run_prompt() {
+fn run_prompt(verbose: bool) {
     let stdin = io::stdin();
     let mut buf = String::new();
     let mut error_reporter = errors::ErrorReporter::new();
@@ -110,20 +114,22 @@ fn run_prompt() {
         print!("> ");
         io::stdout().lock().flush().unwrap();
         if stdin.lock().read_line(&mut buf).is_ok() {
-            run(&buf, &error_reporter);
+            run(&buf, verbose, &error_reporter);
             error_reporter.reset();
             buf.clear();
         }
     }
 }
 
-fn run(code: &str, error_reporter: &errors::ErrorReporter) {
+fn run(code: &str, verbose: bool, error_reporter: &errors::ErrorReporter) {
     let scanner: Scanner = Scanner::new(code, error_reporter);
     let tokens: LinkedList<Token> = scanner.scan_tokens();
 
-    // for t in &tokens {
-    //     println!("Token: {:?}", t);
-    // }
+    if verbose {
+        for t in &tokens {
+            println!("Token: {:?}", t);
+        }
+    }
 
     let mut parser = parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
     let stmts = parser.parse();
@@ -132,14 +138,14 @@ fn run(code: &str, error_reporter: &errors::ErrorReporter) {
         return;
     }
 
-    // let pp = PrettyPrinter {};
-    // for stmt in &stmts {
-    //     let s = pp.print_stmt(&stmt);
-    //     println!("Parsed: {:?}", s);
-    // }
+    if verbose {
+        let pp = PrettyPrinter {};
+        for stmt in &stmts {
+            let s = pp.print_stmt(&stmt);
+            println!("Parsed: {:?}", s);
+        }
+    }
     
     let interpreter = interpreter::Interpreter::new(error_reporter);
     interpreter.interpret(&stmts);
-    // let val = interpreter.interpret(&ast).unwrap_or(LoxValue::Nil);
-    // println!("{}", val);
 }
