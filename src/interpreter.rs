@@ -115,7 +115,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn evaluate_expr(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    pub fn evaluate_expr(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         match expr {
             Expr::Binary(binary) => {
                 let left = self.evaluate_expr(binary.left.as_ref())?;
@@ -128,7 +128,17 @@ impl<'a> Interpreter<'a> {
                 let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
             }
-            Expr::Variable(token) => self.env.get(&token.lexeme),
+            Expr::Variable(token) => self
+                .env
+                .get(&token.lexeme)
+                .or_else(|e| self.error(&token, e)),
+            Expr::Assign(assign_expr) => {
+                let value = self.evaluate_expr(assign_expr.value.as_ref())?;
+                self.env
+                    .assign(&assign_expr.name.lexeme, value.clone())
+                    .or_else(|e| self.error(&assign_expr.name, e).map(|_| ()))?;
+                Ok(value)
+            }
         }
     }
 

@@ -24,4 +24,14 @@ impl Environment {
             Err(RuntimeError::UndefinedVar(name.to_string()))
         }
     }
+
+    pub fn assign(&mut self, name: &str, value: LoxValue) -> Result<(), RuntimeError> {
+        let nm = name.to_string();
+        if self.values.contains_key(&nm) {
+            self.values.insert(nm, value);
+            Ok(())
+        } else {
+            Err(RuntimeError::UndefinedVar(nm))
+        }
+    }
 }

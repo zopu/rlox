@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{
     errors::ErrorReporter,
-    expr::{self, BinaryExpr, Expr, Stmt, UnaryExpr, VarStmt},
+    expr::{self, AssignExpr, BinaryExpr, Expr, Stmt, UnaryExpr, VarStmt},
     tokens::{Token, TokenLiteral, TokenType},
 };
 
@@ -22,6 +22,9 @@ pub enum ParseError {
 
     #[error("Expect n name")]
     VariableNameExpected,
+
+    #[error("Invalid assignment target")]
+    InvalidAssignmentTarget,
 }
 
 pub struct Parser<'a> {
@@ -130,7 +133,24 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.equality()?;
+        if self.match_any(&[TokenType::Equal]) {
+            let eq_token = self.previous();
+            let val = self.assignment()?;
+
+            if let Expr::Variable(name) = expr {
+                return Ok(Expr::Assign(AssignExpr {
+                    name,
+                    value: Box::new(val),
+                }));
+            }
+            return Err(self.error_at(eq_token, ParseError::InvalidAssignmentTarget));
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, ParseError> {
@@ -281,8 +301,11 @@ impl<'a> Parser<'a> {
     }
 
     fn error(&self, error: ParseError) -> ParseError {
-        self.error_reporter
-            .token_error(self.peek(), &error.to_string());
+        self.error_at(self.peek(), error)
+    }
+
+    fn error_at(&self, token: Token, error: ParseError) -> ParseError {
+        self.error_reporter.token_error(token, &error.to_string());
         error
     }
 

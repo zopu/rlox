@@ -9,6 +9,7 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
+    Assign(AssignExpr),
     Binary(BinaryExpr),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
@@ -20,6 +21,12 @@ pub enum Expr {
 pub struct VarStmt {
     pub name: Token,
     pub initializer: Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct AssignExpr {
+    pub name: Token,
+    pub value: Box<Expr>,
 }
 
 #[derive(Debug)]
@@ -57,6 +64,13 @@ impl PrettyPrinter {
 
     pub fn print_expr(&self, e: &Expr) -> String {
         match e {
+            Expr::Assign(e) => {
+                let mut s = e.name.lexeme.clone();
+                s.push_str(" = ");
+                s.push_str(&self.print_expr(&e.value));
+                s.push_str(";");
+                s
+            }
             Expr::Binary(e) => self.parenthesize(&e.operator.lexeme, &[&e.left, &e.right]),
             Expr::Grouping(b) => {
                 let e = b.as_ref();
