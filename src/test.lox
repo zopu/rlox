@@ -3,5 +3,9 @@ Multi
 line
 1.23
 comment */
-print 1 + (2 * 6);
+var foo = 3;
+print 1 + (foo * 6);
+var bar = foo * 2;
 print "hello, world!";
+print bar;
+print foo;

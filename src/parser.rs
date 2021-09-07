@@ -1,6 +1,10 @@
 use thiserror::Error;
 
-use crate::{errors::ErrorReporter, expr::{BinaryExpr, Expr, Stmt, UnaryExpr}, tokens::{Token, TokenLiteral, TokenType}};
+use crate::{
+    errors::ErrorReporter,
+    expr::{self, BinaryExpr, Expr, Stmt, UnaryExpr, VarStmt},
+    tokens::{Token, TokenLiteral, TokenType},
+};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -14,7 +18,10 @@ pub enum ParseError {
     ColonExpectedInTernary,
 
     #[error("Expect ';' after statement")]
-    SemiColonExpected
+    SemiColonExpected,
+
+    #[error("Expect n name")]
+    VariableNameExpected,
 }
 
 pub struct Parser<'a> {
@@ -35,14 +42,36 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Vec<Stmt> {
         let mut statements = Vec::<Stmt>::new();
         while !self.is_at_end() {
-            let s = self.statement();
-            if s.is_ok() {
-                statements.push(s.unwrap());
-            } else {
-                return statements;  // TODO: Panic mode & synchronization
+            if let Ok(s) = self.declaration() {
+                statements.push(s);
             }
         }
         statements
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+        let stmt_result = if self.match_any(&[TokenType::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+        if stmt_result.is_err() {
+            self.synchronize();
+        }
+        stmt_result
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, ParseError::VariableNameExpected)?;
+        let mut initializer = Expr::Literal(TokenLiteral::Nil);
+        if self.match_any(&[TokenType::Equal]) {
+            initializer = self.expression()?;
+        }
+        self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
+        Ok(expr::Stmt::Var(VarStmt {
+            name,
+            initializer: Box::new(initializer),
+        }))
     }
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
@@ -191,6 +220,10 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(self.previous().literal));
         }
 
+        if self.match_any(&[TokenType::Identifier]) {
+            return Ok(Expr::Variable(self.previous()));
+        }
+
         if self.match_any(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, ParseError::RightParenMissing)?;
@@ -251,5 +284,27 @@ impl<'a> Parser<'a> {
         self.error_reporter
             .token_error(self.peek(), &error.to_string());
         error
+    }
+
+    fn synchronize(&mut self) {
+        self.advance();
+        while !self.is_at_end() {
+            if let TokenType::SemiColon = self.previous().token_type {
+                return;
+            }
+
+            match self.peek().token_type {
+                TokenType::Class
+                | TokenType::For
+                | TokenType::Fun
+                | TokenType::If
+                | TokenType::Print
+                | TokenType::Return
+                | TokenType::Var
+                | TokenType::While => return,
+                _ => {}
+            }
+            self.advance();
+        }
     }
 }

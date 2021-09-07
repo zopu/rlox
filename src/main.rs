@@ -5,6 +5,7 @@ use std::io::Write;
 
 use clap::{App, Arg};
 
+mod env;
 mod expr;
 mod interpreter;
 mod parser;
@@ -74,16 +75,17 @@ mod errors {
 }
 
 fn main() {
-
     let matches = App::new("rlox")
         .version("0.1")
-        .arg(Arg::with_name("verbose")
-            .short("V")
-            .long("verbose")
-            .help("Verbose output"))
+        .arg(
+            Arg::with_name("verbose")
+                .short("V")
+                .long("verbose")
+                .help("Verbose output"),
+        )
         .arg(Arg::with_name("FILE"))
         .get_matches();
-    
+
     let verbose = matches.is_present("verbose");
     if let Some(f) = matches.value_of("FILE") {
         run_file(&f, verbose);
@@ -145,7 +147,7 @@ fn run(code: &str, verbose: bool, error_reporter: &errors::ErrorReporter) {
             println!("Parsed: {:?}", s);
         }
     }
-    
-    let interpreter = interpreter::Interpreter::new(error_reporter);
+
+    let mut interpreter = interpreter::Interpreter::new(error_reporter);
     interpreter.interpret(&stmts);
 }

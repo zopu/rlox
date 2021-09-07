@@ -4,6 +4,7 @@ use crate::tokens::{Token, TokenLiteral};
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
+    Var(VarStmt),
 }
 
 #[derive(Debug)]
@@ -12,6 +13,13 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Unary(UnaryExpr),
+    Variable(Token),
+}
+
+#[derive(Debug)]
+pub struct VarStmt {
+    pub name: Token,
+    pub initializer: Box<Expr>,
 }
 
 #[derive(Debug)]
@@ -38,6 +46,12 @@ impl PrettyPrinter {
                 s.push_str(&self.print_expr(e));
                 s
             }
+            Stmt::Var(vs) => {
+                let mut s = "var ".to_string();
+                s.push_str(&vs.name.lexeme);
+                s.push_str(&self.print_expr(vs.initializer.as_ref()));
+                s
+            }
         }
     }
 
@@ -57,6 +71,7 @@ impl PrettyPrinter {
                 TokenLiteral::Number(n) => n.to_string(),
             },
             Expr::Unary(e) => self.parenthesize(&e.operator.lexeme, &[&e.right]),
+            Expr::Variable(token) => token.lexeme.clone(),
         }
     }
 

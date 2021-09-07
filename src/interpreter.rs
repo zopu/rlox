@@ -1,9 +1,14 @@
 use std::{convert::TryFrom, fmt::Display};
 use thiserror::Error;
 
-use crate::{errors::ErrorReporter, expr::{Expr, Stmt}, tokens::{Token, TokenLiteral, TokenType}};
+use crate::{
+    env::Environment,
+    errors::ErrorReporter,
+    expr::{Expr, Stmt},
+    tokens::{Token, TokenLiteral, TokenType},
+};
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LoxValue {
     Nil,
     Boolean(bool),
@@ -67,29 +72,44 @@ pub enum RuntimeError {
 
     #[error("Attempted to divide by zero")]
     DivideByZero,
+
+    #[error("Undefined variable")]
+    UndefinedVar(String),
 }
 
 pub struct Interpreter<'a> {
+    env: Environment,
     error_reporter: &'a ErrorReporter,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(error_reporter: &'a ErrorReporter) -> Self {
-        Interpreter { error_reporter }
+        Interpreter {
+            env: Environment::new(),
+            error_reporter,
+        }
     }
 
-    pub fn interpret(&self, stmts: &Vec<Stmt>) {
+    pub fn interpret(&mut self, stmts: &[Stmt]) {
         for stmt in stmts {
             self.evaluate_stmt(&stmt).unwrap_or(());
         }
     }
 
-    pub fn evaluate_stmt(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    pub fn evaluate_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
-            Stmt::Expression(e) => { self.evaluate_expr(e)?; Ok(()) },
+            Stmt::Expression(e) => {
+                self.evaluate_expr(e)?;
+                Ok(())
+            }
             Stmt::Print(e) => {
                 let val = self.evaluate_expr(e)?;
                 println!("{}", val);
+                Ok(())
+            }
+            Stmt::Var(vs) => {
+                let value = self.evaluate_expr(vs.initializer.as_ref())?;
+                self.env.define(&vs.name.lexeme, value);
                 Ok(())
             }
         }
@@ -108,6 +128,7 @@ impl<'a> Interpreter<'a> {
                 let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
             }
+            Expr::Variable(token) => self.env.get(&token.lexeme),
         }
     }
 
@@ -115,7 +136,7 @@ impl<'a> Interpreter<'a> {
         match (&operator.token_type, &right) {
             (TokenType::Minus, &LoxValue::Number(n)) => Ok(LoxValue::Number(n * -1.0)),
             (TokenType::Bang, right) => Ok(LoxValue::Boolean(!is_truthy(&right))),
-            _ => Err(RuntimeError::UnsupportedOperation),
+            _ => self.error(operator, RuntimeError::UnsupportedOperation),
         }
     }
 
