@@ -3,4 +3,5 @@ Multi
 line
 1.23
 comment */
-1 + (2 * 6)
+print 1 + (2 * 6);
+print "hello, world!";

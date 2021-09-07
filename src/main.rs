@@ -14,7 +14,6 @@ use scanner::Scanner;
 use tokens::Token;
 
 use crate::expr::PrettyPrinter;
-use crate::interpreter::LoxValue;
 
 mod errors {
     use crate::tokens::{Token, TokenType};
@@ -44,7 +43,7 @@ mod errors {
                 let mut location: String = " at '".to_string();
                 location.push_str(&t.lexeme);
                 location.push_str("'");
-                self.report(t.line, " at ", msg);
+                self.report(t.line, &location, msg);
             }
         }
 
@@ -127,17 +126,20 @@ fn run(code: &str, error_reporter: &errors::ErrorReporter) {
     // }
 
     let mut parser = parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
-    let ast = parser.parse().unwrap_or_else(expr::nil);
+    let stmts = parser.parse();
 
     if error_reporter.had_error() {
         return;
     }
 
-    let pp = PrettyPrinter {};
-    let s = pp.print(&ast);
-    println!("Parsed: {:?}", s);
-
+    // let pp = PrettyPrinter {};
+    // for stmt in &stmts {
+    //     let s = pp.print_stmt(&stmt);
+    //     println!("Parsed: {:?}", s);
+    // }
+    
     let interpreter = interpreter::Interpreter::new(error_reporter);
-    let val = interpreter.interpret(&ast).unwrap_or(LoxValue::Nil);
-    println!("{}", val);
+    interpreter.interpret(&stmts);
+    // let val = interpreter.interpret(&ast).unwrap_or(LoxValue::Nil);
+    // println!("{}", val);
 }

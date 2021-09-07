@@ -1,11 +1,7 @@
 use std::{convert::TryFrom, fmt::Display};
 use thiserror::Error;
 
-use crate::{
-    errors::ErrorReporter,
-    expr::Expr,
-    tokens::{Token, TokenLiteral, TokenType},
-};
+use crate::{errors::ErrorReporter, expr::{Expr, Stmt}, tokens::{Token, TokenLiteral, TokenType}};
 
 #[derive(Debug, PartialEq)]
 pub enum LoxValue {
@@ -82,17 +78,34 @@ impl<'a> Interpreter<'a> {
         Interpreter { error_reporter }
     }
 
-    pub fn interpret(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    pub fn interpret(&self, stmts: &Vec<Stmt>) {
+        for stmt in stmts {
+            self.evaluate_stmt(&stmt).unwrap_or(());
+        }
+    }
+
+    pub fn evaluate_stmt(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match stmt {
+            Stmt::Expression(e) => { self.evaluate_expr(e)?; Ok(()) },
+            Stmt::Print(e) => {
+                let val = self.evaluate_expr(e)?;
+                println!("{}", val);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn evaluate_expr(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         match expr {
             Expr::Binary(binary) => {
-                let left = self.interpret(binary.left.as_ref())?;
-                let right = self.interpret(binary.right.as_ref())?;
+                let left = self.evaluate_expr(binary.left.as_ref())?;
+                let right = self.evaluate_expr(binary.right.as_ref())?;
                 self.evaluate_binary(&binary.operator, &left, &right)
             }
-            Expr::Grouping(e) => self.interpret(e.as_ref()),
+            Expr::Grouping(e) => self.evaluate_expr(e.as_ref()),
             Expr::Literal(l) => Ok(LoxValue::try_from(l).unwrap_or(LoxValue::Nil)),
             Expr::Unary(unary) => {
-                let right = self.interpret(unary.right.as_ref())?;
+                let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
             }
         }

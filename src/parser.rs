@@ -1,10 +1,6 @@
 use thiserror::Error;
 
-use crate::{
-    errors::ErrorReporter,
-    expr::{BinaryExpr, Expr, UnaryExpr},
-    tokens::{Token, TokenLiteral, TokenType},
-};
+use crate::{errors::ErrorReporter, expr::{BinaryExpr, Expr, Stmt, UnaryExpr}, tokens::{Token, TokenLiteral, TokenType}};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -16,6 +12,9 @@ pub enum ParseError {
 
     #[error("Expect ':' in ternary operator")]
     ColonExpectedInTernary,
+
+    #[error("Expect ';' after statement")]
+    SemiColonExpected
 }
 
 pub struct Parser<'a> {
@@ -33,11 +32,37 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Option<Expr> {
-        match self.expression_list() {
-            Ok(expr) => Some(expr),
-            Err(_) => None,
+    pub fn parse(&mut self) -> Vec<Stmt> {
+        let mut statements = Vec::<Stmt>::new();
+        while !self.is_at_end() {
+            let s = self.statement();
+            if s.is_ok() {
+                statements.push(s.unwrap());
+            } else {
+                return statements;  // TODO: Panic mode & synchronization
+            }
         }
+        statements
+    }
+
+    fn statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.match_any(&[TokenType::Print]) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt, ParseError> {
+        let expr = self.expression_list()?;
+        self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
+        Ok(Stmt::Print(expr))
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
+        let expr = self.expression_list()?;
+        self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
+        Ok(Stmt::Expression(expr))
     }
 
     fn expression_list(&mut self) -> Result<Expr, ParseError> {

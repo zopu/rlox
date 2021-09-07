@@ -1,6 +1,12 @@
 use crate::tokens::{Token, TokenLiteral};
 
 #[derive(Debug)]
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
+#[derive(Debug)]
 pub enum Expr {
     Binary(BinaryExpr),
     Grouping(Box<Expr>),
@@ -21,14 +27,21 @@ pub struct UnaryExpr {
     pub right: Box<Expr>,
 }
 
-pub fn nil() -> Expr {
-    Expr::Literal(TokenLiteral::Nil)
-}
-
 pub struct PrettyPrinter {}
 
 impl PrettyPrinter {
-    pub fn print(&self, e: &Expr) -> String {
+    pub fn print_stmt(&self, stmt: &Stmt) -> String {
+        match stmt {
+            Stmt::Expression(e) => self.print_expr(e),
+            Stmt::Print(e) => {
+                let mut s = "print ".to_string();
+                s.push_str(&self.print_expr(e));
+                s
+            }
+        }
+    }
+
+    pub fn print_expr(&self, e: &Expr) -> String {
         match e {
             Expr::Binary(e) => self.parenthesize(&e.operator.lexeme, &[&e.left, &e.right]),
             Expr::Grouping(b) => {
@@ -52,7 +65,7 @@ impl PrettyPrinter {
         s.push_str(name);
         for e in exprs {
             s.push(' ');
-            s.push_str(&self.print(e));
+            s.push_str(&self.print_expr(e));
         }
         s.push_str(")");
         s
@@ -78,7 +91,7 @@ mod test {
         });
 
         let pp = PrettyPrinter {};
-        let s = pp.print(&e);
+        let s = pp.print_expr(&e);
         println!("AST: {}", s);
     }
 }
