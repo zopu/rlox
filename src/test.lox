@@ -3,9 +3,22 @@ Multi
 line
 1.23
 comment */
-var foo = 3;
-print 1 + (foo * 6);
-var bar = foo * 2;
+
 print "hello, world!";
-print bar;
-print foo;
+
+var foo = 3;
+var result = 1 + (foo * 2);
+print "Should be 7: " + result;
+
+var bar = foo * 2;
+var baz = 3;
+{
+    var bar = 4;
+    print "Should be 4: " + bar;
+    {
+        baz = 8;
+    }
+}
+print "Should be 6: " + bar;
+print "Should be 3: " + foo;
+print "Should be 8: " + baz;

@@ -2,6 +2,7 @@ use crate::tokens::{Token, TokenLiteral};
 
 #[derive(Debug)]
 pub enum Stmt {
+    Block(Vec<Stmt>),
     Expression(Expr),
     Print(Expr),
     Var(VarStmt),
@@ -47,16 +48,25 @@ pub struct PrettyPrinter {}
 impl PrettyPrinter {
     pub fn print_stmt(&self, stmt: &Stmt) -> String {
         match stmt {
+            Stmt::Block(vec) => {
+                let mut s = String::new();
+                for statement in vec {
+                    s.push_str(&self.print_stmt(statement));
+                }
+                s
+            }
             Stmt::Expression(e) => self.print_expr(e),
             Stmt::Print(e) => {
                 let mut s = "print ".to_string();
                 s.push_str(&self.print_expr(e));
+                s.push_str(";");
                 s
             }
             Stmt::Var(vs) => {
                 let mut s = "var ".to_string();
                 s.push_str(&vs.name.lexeme);
                 s.push_str(&self.print_expr(vs.initializer.as_ref()));
+                s.push_str(";");
                 s
             }
         }

@@ -1,16 +1,22 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::interpreter::{LoxValue, RuntimeError};
 
 pub struct Environment {
+    enclosing: Option<Rc<RefCell<Environment>>>,
     values: HashMap<String, LoxValue>,
 }
 
 impl Environment {
-    pub fn new() -> Self {
+    pub fn new(enclosing: Option<Rc<RefCell<Environment>>>) -> Self {
         Environment {
+            enclosing,
             values: HashMap::new(),
         }
+    }
+
+    pub fn enclosing(&self) -> Option<Rc<RefCell<Environment>>> {
+        self.enclosing.clone()
     }
 
     pub fn define(&mut self, name: &str, value: LoxValue) {
@@ -21,7 +27,11 @@ impl Environment {
         if let Some(val) = self.values.get(&name.to_string()) {
             Ok(val.clone())
         } else {
-            Err(RuntimeError::UndefinedVar(name.to_string()))
+            if let Some(parent) = &self.enclosing {
+                (*parent).borrow().get(name)
+            } else {
+                Err(RuntimeError::UndefinedVar(name.to_string()))
+            }
         }
     }
 
@@ -31,7 +41,11 @@ impl Environment {
             self.values.insert(nm, value);
             Ok(())
         } else {
-            Err(RuntimeError::UndefinedVar(nm))
+            if let Some(parent) = &self.enclosing {
+                (**parent).borrow_mut().assign(name, value)
+            } else {
+                Err(RuntimeError::UndefinedVar(nm))
+            }
         }
     }
 }

@@ -66,8 +66,8 @@ impl<'a> Scanner<'a> {
         match c {
             '(' => self.add_token(TokenType::LeftParen),
             ')' => self.add_token(TokenType::RightParen),
-            '[' => self.add_token(TokenType::LeftBrace),
-            ']' => self.add_token(TokenType::RightBrace),
+            '{' => self.add_token(TokenType::LeftBrace),
+            '}' => self.add_token(TokenType::RightBrace),
             ':' => self.add_token(TokenType::Colon),
             ',' => self.add_token(TokenType::Comma),
             '.' => self.add_token(TokenType::Dot),

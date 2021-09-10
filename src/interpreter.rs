@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, fmt::Display};
+use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc};
 use thiserror::Error;
 
 use crate::{
@@ -78,14 +78,14 @@ pub enum RuntimeError {
 }
 
 pub struct Interpreter<'a> {
-    env: Environment,
+    env: Rc<RefCell<Environment>>,
     error_reporter: &'a ErrorReporter,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(error_reporter: &'a ErrorReporter) -> Self {
         Interpreter {
-            env: Environment::new(),
+            env: Rc::new(RefCell::new(Environment::new(None))),
             error_reporter,
         }
     }
@@ -98,6 +98,10 @@ impl<'a> Interpreter<'a> {
 
     pub fn evaluate_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
+            Stmt::Block(vec) => {
+                self.execute_block(vec)?;
+                Ok(())
+            }
             Stmt::Expression(e) => {
                 self.evaluate_expr(e)?;
                 Ok(())
@@ -109,13 +113,33 @@ impl<'a> Interpreter<'a> {
             }
             Stmt::Var(vs) => {
                 let value = self.evaluate_expr(vs.initializer.as_ref())?;
-                self.env.define(&vs.name.lexeme, value);
+                self.env.borrow_mut().define(&vs.name.lexeme, value);
                 Ok(())
             }
         }
     }
 
-    pub fn evaluate_expr(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn execute_block(&mut self, stmts: &Vec<Stmt>) -> Result<(), RuntimeError> {
+        let block_env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
+        self.env = block_env;
+
+        for stmt in stmts {
+            let result = self.evaluate_stmt(stmt);
+            if let Err(e) = result {
+                self.close_scope();
+                return Err(e);
+            }
+        }
+        self.close_scope();
+        Ok(())
+    }
+
+    fn close_scope(&mut self) {
+        let enclosing_env = self.env.borrow().enclosing().expect("This environment should not be the root environment");        
+        self.env = enclosing_env;
+    }
+
+    fn evaluate_expr(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         match expr {
             Expr::Binary(binary) => {
                 let left = self.evaluate_expr(binary.left.as_ref())?;
@@ -130,11 +154,13 @@ impl<'a> Interpreter<'a> {
             }
             Expr::Variable(token) => self
                 .env
+                .borrow()
                 .get(&token.lexeme)
                 .or_else(|e| self.error(&token, e)),
             Expr::Assign(assign_expr) => {
                 let value = self.evaluate_expr(assign_expr.value.as_ref())?;
                 self.env
+                    .borrow_mut()
                     .assign(&assign_expr.name.lexeme, value.clone())
                     .or_else(|e| self.error(&assign_expr.name, e).map(|_| ()))?;
                 Ok(value)

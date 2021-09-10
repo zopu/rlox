@@ -17,6 +17,9 @@ pub enum ParseError {
     #[error("Expect ':' in ternary operator")]
     ColonExpectedInTernary,
 
+    #[error("Expect '}}' at end of block")]
+    RightBraceExpected,
+
     #[error("Expect ';' after statement")]
     SemiColonExpected,
 
@@ -79,16 +82,28 @@ impl<'a> Parser<'a> {
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         if self.match_any(&[TokenType::Print]) {
-            self.print_statement()
-        } else {
-            self.expression_statement()
+            return self.print_statement();
         }
+        if self.match_any(&[TokenType::LeftBrace]) {
+            return Ok(Stmt::Block(self.block()?));
+        }
+        self.expression_statement()
     }
 
     fn print_statement(&mut self) -> Result<Stmt, ParseError> {
         let expr = self.expression_list()?;
         self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
         Ok(Stmt::Print(expr))
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let mut stmts: Vec<Stmt> = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            stmts.push(self.declaration()?);
+        }
+        self.consume(TokenType::RightBrace, ParseError::RightBraceExpected)?;
+        Ok(stmts)
     }
 
     fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
