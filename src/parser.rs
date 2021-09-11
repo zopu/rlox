@@ -45,7 +45,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Vec<Stmt> {
+    pub fn parse_stmts(&mut self) -> Vec<Stmt> {
         let mut statements = Vec::<Stmt>::new();
         while !self.is_at_end() {
             if let Ok(s) = self.declaration() {
@@ -53,6 +53,10 @@ impl<'a> Parser<'a> {
             }
         }
         statements
+    }
+
+    pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        self.expression_list()
     }
 
     fn declaration(&mut self) -> Result<Stmt, ParseError> {

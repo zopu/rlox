@@ -96,6 +96,13 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    pub fn interpret_expr(&mut self, expr: &Expr) {
+        let result = self.evaluate_expr(expr);
+        if let Ok(val) = result {
+            println!("Result: {}", val);
+        }
+    }
+
     pub fn evaluate_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Block(vec) => {
@@ -135,7 +142,11 @@ impl<'a> Interpreter<'a> {
     }
 
     fn close_scope(&mut self) {
-        let enclosing_env = self.env.borrow().enclosing().expect("This environment should not be the root environment");        
+        let enclosing_env = self
+            .env
+            .borrow()
+            .enclosing()
+            .expect("This environment should not be the root environment");
         self.env = enclosing_env;
     }
 

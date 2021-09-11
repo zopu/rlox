@@ -26,12 +26,10 @@ impl Environment {
     pub fn get(&self, name: &str) -> Result<LoxValue, RuntimeError> {
         if let Some(val) = self.values.get(&name.to_string()) {
             Ok(val.clone())
+        } else if let Some(parent) = &self.enclosing {
+            (*parent).borrow().get(name)
         } else {
-            if let Some(parent) = &self.enclosing {
-                (*parent).borrow().get(name)
-            } else {
-                Err(RuntimeError::UndefinedVar(name.to_string()))
-            }
+            Err(RuntimeError::UndefinedVar(name.to_string()))
         }
     }
 
@@ -40,12 +38,10 @@ impl Environment {
         if self.values.contains_key(&nm) {
             self.values.insert(nm, value);
             Ok(())
+        } else if let Some(parent) = &self.enclosing {
+            (**parent).borrow_mut().assign(name, value)
         } else {
-            if let Some(parent) = &self.enclosing {
-                (**parent).borrow_mut().assign(name, value)
-            } else {
-                Err(RuntimeError::UndefinedVar(nm))
-            }
+            Err(RuntimeError::UndefinedVar(nm))
         }
     }
 }

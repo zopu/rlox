@@ -19,9 +19,13 @@ use crate::expr::PrettyPrinter;
 
 mod errors {
     use crate::tokens::{Token, TokenType};
-    use std::cell::RefCell;
+    use std::{
+        cell::RefCell,
+        sync::{Arc, Mutex},
+    };
 
     pub struct ErrorReporter {
+        errors_collected: Arc<Mutex<Vec<String>>>,
         had_error: RefCell<bool>,
         had_runtime_error: RefCell<bool>,
     }
@@ -29,6 +33,7 @@ mod errors {
     impl ErrorReporter {
         pub fn new() -> ErrorReporter {
             ErrorReporter {
+                errors_collected: Arc::new(Mutex::new(Vec::new())),
                 had_error: RefCell::new(false),
                 had_runtime_error: RefCell::new(false),
             }
@@ -51,12 +56,18 @@ mod errors {
 
         pub fn runtime_error(&self, line: usize, msg: &str) {
             self.had_runtime_error.replace(true);
-            println!("[Line {}] Runtime Error: {}", line, msg);
+            self.errors_collected
+                .lock()
+                .unwrap()
+                .push(format!("[Line {}] Runtime Error: {}", line, msg));
         }
 
         pub fn report(&self, line: usize, location: &str, msg: &str) {
             self.had_error.replace(true);
-            println!("[line {}] Error {}: {}", line, location, msg);
+            self.errors_collected
+                .lock()
+                .unwrap()
+                .push(format!("[line {}] Error {}: {}", line, location, msg));
         }
 
         pub fn had_error(&self) -> bool {
@@ -65,6 +76,12 @@ mod errors {
 
         pub fn had_runtime_error(&self) -> bool {
             *self.had_runtime_error.borrow()
+        }
+
+        pub fn print_collected_errors(&self) {
+            for s in &*self.errors_collected.lock().unwrap() {
+                println!("{}", s);
+            }
         }
 
         pub fn reset(&mut self) {
@@ -95,10 +112,10 @@ fn main() {
 }
 
 fn run_file(filename: &str, verbose: bool) {
-    println!("running file {:?}", filename);
+    // println!("running file {:?}", filename);
     let contents = std::fs::read_to_string(filename).expect("Could not read input file");
     let error_reporter = errors::ErrorReporter::new();
-    run(&contents, verbose, &error_reporter);
+    run(&contents, false, verbose, &error_reporter);
     if error_reporter.had_error() {
         std::process::exit(65);
     }
@@ -116,14 +133,14 @@ fn run_prompt(verbose: bool) {
         print!("> ");
         io::stdout().lock().flush().unwrap();
         if stdin.lock().read_line(&mut buf).is_ok() {
-            run(&buf, verbose, &error_reporter);
+            run(&buf, true, verbose, &error_reporter);
             error_reporter.reset();
             buf.clear();
         }
     }
 }
 
-fn run(code: &str, verbose: bool, error_reporter: &errors::ErrorReporter) {
+fn run(code: &str, allow_exprs: bool, verbose: bool, error_reporter: &errors::ErrorReporter) {
     let scanner: Scanner = Scanner::new(code, error_reporter);
     let tokens: LinkedList<Token> = scanner.scan_tokens();
 
@@ -133,11 +150,33 @@ fn run(code: &str, verbose: bool, error_reporter: &errors::ErrorReporter) {
         }
     }
 
-    let mut parser = parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
-    let stmts = parser.parse();
+    if error_reporter.had_error() {
+        error_reporter.print_collected_errors();
+    }
+
+    let mut parser = parser::Parser::new(tokens.clone().into_iter().collect(), &error_reporter);
+    let mut interpreter = interpreter::Interpreter::new(error_reporter);
+
+    let stmts = parser.parse_stmts();
 
     if error_reporter.had_error() {
-        return;
+        if allow_exprs {
+            // Try to parse and evaluate a statement instead
+            let mut expr_parser =
+                parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
+            if let Ok(expr) = expr_parser.parse_expr() {
+                interpreter.interpret_expr(&expr);
+                if error_reporter.had_runtime_error() {
+                    error_reporter.print_collected_errors();
+                }
+            } else {
+                error_reporter.print_collected_errors();
+            }
+            return;
+        } else {
+            error_reporter.print_collected_errors();
+            return;
+        }
     }
 
     if verbose {
@@ -148,6 +187,8 @@ fn run(code: &str, verbose: bool, error_reporter: &errors::ErrorReporter) {
         }
     }
 
-    let mut interpreter = interpreter::Interpreter::new(error_reporter);
     interpreter.interpret(&stmts);
+    if error_reporter.had_runtime_error() {
+        error_reporter.print_collected_errors();
+    }
 }
