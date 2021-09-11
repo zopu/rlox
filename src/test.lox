@@ -22,3 +22,9 @@ var baz = 3;
 print "Should be 6: " + bar;
 print "Should be 3: " + foo;
 print "Should be 8: " + baz;
+
+if (1 <= 2) {
+    print "ok";
+} else {
+    print "FAIL";
+}

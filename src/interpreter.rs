@@ -113,6 +113,15 @@ impl<'a> Interpreter<'a> {
                 self.evaluate_expr(e)?;
                 Ok(())
             }
+            Stmt::If(e) => {
+                let condition = self.evaluate_expr(&e.condition)?;
+                if is_truthy(&condition) {
+                    self.evaluate_stmt(&e.then_branch)?;
+                } else if let Some(else_branch) = &e.else_branch {
+                    self.evaluate_stmt(else_branch)?;
+                }
+                Ok(())
+            }
             Stmt::Print(e) => {
                 let val = self.evaluate_expr(e)?;
                 println!("{}", val);

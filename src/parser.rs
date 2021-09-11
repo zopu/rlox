@@ -1,24 +1,26 @@
 use thiserror::Error;
 
-use crate::{
-    errors::ErrorReporter,
-    expr::{self, AssignExpr, BinaryExpr, Expr, Stmt, UnaryExpr, VarStmt},
-    tokens::{Token, TokenLiteral, TokenType},
-};
+use crate::{errors::ErrorReporter, expr::{self, AssignExpr, BinaryExpr, Expr, IfStmt, Stmt, UnaryExpr, VarStmt}, tokens::{Token, TokenLiteral, TokenType}};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
-    #[error("Expect ')' after expression")]
-    RightParenMissing,
+    #[error("Expect ':' in ternary operator")]
+    ColonExpectedInTernary,
 
     #[error("Expect expression")]
     ExpressionExpected,
 
-    #[error("Expect ':' in ternary operator")]
-    ColonExpectedInTernary,
+    #[error("Expect '(' after if")]
+    IfStmtLeftParenExpected,
+
+    #[error("Expect ')' in if statement")]
+    IfStmtRightParenExpected,
 
     #[error("Expect '}}' at end of block")]
     RightBraceExpected,
+
+    #[error("Expect ')' after expression")]
+    RightParenMissing,
 
     #[error("Expect ';' after statement")]
     SemiColonExpected,
@@ -85,6 +87,9 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.match_any(&[TokenType::If]) {
+            return self.if_statement();
+        }
         if self.match_any(&[TokenType::Print]) {
             return self.print_statement();
         }
@@ -92,6 +97,22 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::Block(self.block()?));
         }
         self.expression_statement()
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.consume(TokenType::LeftParen, ParseError::IfStmtLeftParenExpected)?;
+        let condition = Box::new(self.expression_list()?);
+        self.consume(TokenType::RightParen, ParseError::IfStmtRightParenExpected)?;
+        let then_branch = Box::new(self.statement()?);
+        let mut else_branch: Option<Box<Stmt>> = None;
+        if self.match_any(&[TokenType::Else]) {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+        Ok(Stmt::If(IfStmt {
+            condition,
+            then_branch,
+            else_branch,
+        }))
     }
 
     fn print_statement(&mut self) -> Result<Stmt, ParseError> {

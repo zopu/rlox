@@ -4,6 +4,7 @@ use crate::tokens::{Token, TokenLiteral};
 pub enum Stmt {
     Block(Vec<Stmt>),
     Expression(Expr),
+    If(IfStmt),
     Print(Expr),
     Var(VarStmt),
 }
@@ -16,6 +17,13 @@ pub enum Expr {
     Literal(TokenLiteral),
     Unary(UnaryExpr),
     Variable(Token),
+}
+
+#[derive(Debug)]
+pub struct IfStmt {
+    pub condition: Box<Expr>,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>,
 }
 
 #[derive(Debug)]
@@ -56,6 +64,18 @@ impl PrettyPrinter {
                 s
             }
             Stmt::Expression(e) => self.print_expr(e),
+            Stmt::If(e) => {
+                let mut s = "if (".to_string();
+                s.push_str(&self.print_expr(&e.condition));
+                s.push_str(") ");
+                
+                s.push_str(&self.print_stmt(&e.then_branch));
+                if let Some(else_stmt) = &e.else_branch {
+                    s.push_str(&self.print_stmt(else_stmt));
+                }
+                s.push_str(";");
+                s
+            }
             Stmt::Print(e) => {
                 let mut s = "print ".to_string();
                 s.push_str(&self.print_expr(e));
