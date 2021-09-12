@@ -1,6 +1,10 @@
 use thiserror::Error;
 
-use crate::{errors::ErrorReporter, expr::{self, AssignExpr, BinaryExpr, Expr, IfStmt, Stmt, UnaryExpr, VarStmt}, tokens::{Token, TokenLiteral, TokenType}};
+use crate::{
+    errors::ErrorReporter,
+    expr::{self, AssignExpr, BinaryExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt},
+    tokens::{Token, TokenLiteral, TokenType},
+};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -177,7 +181,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
         if self.match_any(&[TokenType::Equal]) {
             let eq_token = self.previous();
             let val = self.assignment()?;
@@ -189,6 +193,34 @@ impl<'a> Parser<'a> {
                 }));
             }
             return Err(self.error_at(eq_token, ParseError::InvalidAssignmentTarget));
+        }
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.and()?;
+        while self.match_any(&[TokenType::Or]) {
+            let operator = self.previous();
+            let right = Box::new(self.and()?);
+            expr = Expr::Logical(LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right,
+            });
+        }
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.equality()?;
+        while self.match_any(&[TokenType::And]) {
+            let operator = self.previous();
+            let right = Box::new(self.equality()?);
+            expr = Expr::Logical(LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right,
+            });
         }
         Ok(expr)
     }

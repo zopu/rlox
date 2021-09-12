@@ -135,7 +135,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn execute_block(&mut self, stmts: &Vec<Stmt>) -> Result<(), RuntimeError> {
+    fn execute_block(&mut self, stmts: &[Stmt]) -> Result<(), RuntimeError> {
         let block_env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
         self.env = block_env;
 
@@ -168,6 +168,7 @@ impl<'a> Interpreter<'a> {
             }
             Expr::Grouping(e) => self.evaluate_expr(e.as_ref()),
             Expr::Literal(l) => Ok(LoxValue::try_from(l).unwrap_or(LoxValue::Nil)),
+            Expr::Logical(e) => self.evaluate_logical(&e.left, &e.operator, &e.right),
             Expr::Unary(unary) => {
                 let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
@@ -186,6 +187,23 @@ impl<'a> Interpreter<'a> {
                 Ok(value)
             }
         }
+    }
+
+    fn evaluate_logical(
+        &mut self,
+        left: &Expr,
+        op: &Token,
+        right: &Expr,
+    ) -> Result<LoxValue, RuntimeError> {
+        let left_val = self.evaluate_expr(left)?;
+        if let TokenType::Or = op.token_type {
+            if is_truthy(&left_val) {
+                return Ok(left_val);
+            }
+        } else if !is_truthy(&left_val) {
+            return Ok(left_val);
+        }
+        self.evaluate_expr(right)
     }
 
     fn evaluate_unary(&self, operator: &Token, right: &LoxValue) -> Result<LoxValue, RuntimeError> {
@@ -273,7 +291,7 @@ impl<'a> Interpreter<'a> {
 fn is_truthy(val: &LoxValue) -> bool {
     match val {
         LoxValue::Nil => false,
-        LoxValue::Boolean(true) => true,
-        _ => false,
+        LoxValue::Boolean(false) => false,
+        _ => true,
     }
 }

@@ -15,6 +15,7 @@ pub enum Expr {
     Binary(BinaryExpr),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
+    Logical(LogicalExpr),
     Unary(UnaryExpr),
     Variable(Token),
 }
@@ -46,6 +47,13 @@ pub struct BinaryExpr {
 }
 
 #[derive(Debug)]
+pub struct LogicalExpr {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
+}
+
+#[derive(Debug)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub right: Box<Expr>,
@@ -68,7 +76,6 @@ impl PrettyPrinter {
                 let mut s = "if (".to_string();
                 s.push_str(&self.print_expr(&e.condition));
                 s.push_str(") ");
-                
                 s.push_str(&self.print_stmt(&e.then_branch));
                 if let Some(else_stmt) = &e.else_branch {
                     s.push_str(&self.print_stmt(else_stmt));
@@ -114,6 +121,7 @@ impl PrettyPrinter {
                 TokenLiteral::String(s) => s.clone(),
                 TokenLiteral::Number(n) => n.to_string(),
             },
+            Expr::Logical(e) => self.parenthesize(&e.operator.lexeme, &[&e.left, &e.right]),
             Expr::Unary(e) => self.parenthesize(&e.operator.lexeme, &[&e.right]),
             Expr::Variable(token) => token.lexeme.clone(),
         }

@@ -28,3 +28,12 @@ if (1 <= 2) {
 } else {
     print "FAIL";
 }
+
+print "ok" or "not ok";
+print "not ok" and "ok";
+print true and "ok" ;
+print false or "ok";
+if (false or false) print "not ok";
+else {
+    print "ok";
+}
