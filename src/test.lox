@@ -37,3 +37,11 @@ if (false or false) print "not ok";
 else {
     print "ok";
 }
+
+var whileTest = 0;
+var counter = 10;
+while (counter > 0) {
+    whileTest = whileTest + 1;
+    counter = counter - 1;
+}
+print "Should be 10: " + whileTest;

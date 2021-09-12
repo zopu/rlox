@@ -1,10 +1,6 @@
 use thiserror::Error;
 
-use crate::{
-    errors::ErrorReporter,
-    expr::{self, AssignExpr, BinaryExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt},
-    tokens::{Token, TokenLiteral, TokenType},
-};
+use crate::{errors::ErrorReporter, expr::{self, AssignExpr, BinaryExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt, WhileStmt}, tokens::{Token, TokenLiteral, TokenType}};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -20,6 +16,9 @@ pub enum ParseError {
     #[error("Expect ')' in if statement")]
     IfStmtRightParenExpected,
 
+    #[error("Invalid assignment target")]
+    InvalidAssignmentTarget,
+
     #[error("Expect '}}' at end of block")]
     RightBraceExpected,
 
@@ -31,9 +30,12 @@ pub enum ParseError {
 
     #[error("Expect n name")]
     VariableNameExpected,
+    
+    #[error("Expect '(' after while")]
+    WhileStmtLeftParenExpected,
 
-    #[error("Invalid assignment target")]
-    InvalidAssignmentTarget,
+    #[error("Expect ')' in while statement")]
+    WhileStmtRightParenExpected,
 }
 
 pub struct Parser<'a> {
@@ -97,6 +99,9 @@ impl<'a> Parser<'a> {
         if self.match_any(&[TokenType::Print]) {
             return self.print_statement();
         }
+        if self.match_any(&[TokenType::While]) {
+            return self.while_statement();
+        }
         if self.match_any(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block(self.block()?));
         }
@@ -123,6 +128,15 @@ impl<'a> Parser<'a> {
         let expr = self.expression_list()?;
         self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
         Ok(Stmt::Print(expr))
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.consume(TokenType::LeftParen, ParseError::WhileStmtLeftParenExpected)?;
+        let condition = Box::new(self.expression_list()?);
+        self.consume(TokenType::RightParen, ParseError::WhileStmtRightParenExpected)?;
+        let body = Box::new(self.statement()?);
+
+        Ok(Stmt::While(WhileStmt { condition, body }))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>, ParseError> {

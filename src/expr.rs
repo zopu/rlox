@@ -6,6 +6,7 @@ pub enum Stmt {
     Expression(Expr),
     If(IfStmt),
     Print(Expr),
+    While(WhileStmt),
     Var(VarStmt),
 }
 
@@ -25,6 +26,12 @@ pub struct IfStmt {
     pub condition: Box<Expr>,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
+}
+
+#[derive(Debug)]
+pub struct WhileStmt {
+    pub condition: Box<Expr>,
+    pub body: Box<Stmt>,
 }
 
 #[derive(Debug)]
@@ -87,6 +94,13 @@ impl PrettyPrinter {
                 let mut s = "print ".to_string();
                 s.push_str(&self.print_expr(e));
                 s.push_str(";");
+                s
+            }
+            Stmt::While(WhileStmt { condition, body }) => {
+                let mut s = "while (".to_string();
+                s.push_str(&self.print_expr(&condition));
+                s.push_str(") ");
+                s.push_str(&self.print_stmt(&body));
                 s
             }
             Stmt::Var(vs) => {

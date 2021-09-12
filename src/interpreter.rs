@@ -1,12 +1,7 @@
 use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc};
 use thiserror::Error;
 
-use crate::{
-    env::Environment,
-    errors::ErrorReporter,
-    expr::{Expr, Stmt},
-    tokens::{Token, TokenLiteral, TokenType},
-};
+use crate::{env::Environment, errors::ErrorReporter, expr::{Expr, Stmt, WhileStmt}, tokens::{Token, TokenLiteral, TokenType}};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LoxValue {
@@ -125,6 +120,12 @@ impl<'a> Interpreter<'a> {
             Stmt::Print(e) => {
                 let val = self.evaluate_expr(e)?;
                 println!("{}", val);
+                Ok(())
+            }
+            Stmt::While(WhileStmt { condition, body }) => {
+                while is_truthy(&self.evaluate_expr(&condition)?) {
+                    self.evaluate_stmt(body)?;
+                }
                 Ok(())
             }
             Stmt::Var(vs) => {
