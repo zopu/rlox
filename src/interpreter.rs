@@ -1,7 +1,12 @@
 use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc};
 use thiserror::Error;
 
-use crate::{env::Environment, errors::ErrorReporter, expr::{Expr, Stmt, WhileStmt}, tokens::{Token, TokenLiteral, TokenType}};
+use crate::{
+    env::Environment,
+    errors::ErrorReporter,
+    expr::{Expr, Stmt, WhileStmt},
+    tokens::{Token, TokenLiteral, TokenType},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LoxValue {

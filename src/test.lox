@@ -45,3 +45,15 @@ while (counter > 0) {
     counter = counter - 1;
 }
 print "Should be 10: " + whileTest;
+
+var cnt = 0;
+for (var i = 0; i <= 50; i = i + 1) {
+    cnt = cnt + i;
+}
+print "Should be 1275: " + cnt;
+
+cnt = 0;
+for (;cnt < 10;) {
+    cnt = cnt + 1;
+}
+print "Should be 9: " + 9;

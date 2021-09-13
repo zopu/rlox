@@ -1,6 +1,13 @@
 use thiserror::Error;
 
-use crate::{errors::ErrorReporter, expr::{self, AssignExpr, BinaryExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt, WhileStmt}, tokens::{Token, TokenLiteral, TokenType}};
+use crate::{
+    errors::ErrorReporter,
+    expr::{
+        self, AssignExpr, BinaryExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt,
+        WhileStmt,
+    },
+    tokens::{Token, TokenLiteral, TokenType},
+};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -9,6 +16,15 @@ pub enum ParseError {
 
     #[error("Expect expression")]
     ExpressionExpected,
+
+    #[error("Expect '(' after for")]
+    ForStmtLeftParenExpected,
+
+    #[error("Expect ')' in for statement")]
+    ForStmtRightParenExpected,
+
+    #[error("Expect ';' in for statement after loop condition")]
+    ForStmtSemiColonExpected,
 
     #[error("Expect '(' after if")]
     IfStmtLeftParenExpected,
@@ -30,7 +46,7 @@ pub enum ParseError {
 
     #[error("Expect n name")]
     VariableNameExpected,
-    
+
     #[error("Expect '(' after while")]
     WhileStmtLeftParenExpected,
 
@@ -93,6 +109,9 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.match_any(&[TokenType::For]) {
+            return self.for_statement();
+        }
         if self.match_any(&[TokenType::If]) {
             return self.if_statement();
         }
@@ -106,6 +125,46 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::Block(self.block()?));
         }
         self.expression_statement()
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.consume(TokenType::LeftParen, ParseError::ForStmtLeftParenExpected)?;
+        let initializer = if self.match_any(&[TokenType::SemiColon]) {
+            None
+        } else if self.match_any(&[TokenType::Var]) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        let mut condition = Expr::Literal(TokenLiteral::True);
+        if !self.check(&TokenType::SemiColon) {
+            condition = self.expression()?;
+        }
+        self.consume(TokenType::SemiColon, ParseError::ForStmtSemiColonExpected)?;
+
+        let mut increment: Option<Expr> = None;
+        if !self.check(&TokenType::RightParen) {
+            increment = Some(self.expression()?);
+        }
+        self.consume(TokenType::RightParen, ParseError::ForStmtRightParenExpected)?;
+
+        let mut body = self.statement()?;
+
+        if let Some(inc) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expression(inc)]);
+        }
+
+        body = Stmt::While(WhileStmt {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        });
+
+        if let Some(init) = initializer {
+            body = Stmt::Block(vec![init, body]);
+        }
+
+        Ok(body)
     }
 
     fn if_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -133,7 +192,10 @@ impl<'a> Parser<'a> {
     fn while_statement(&mut self) -> Result<Stmt, ParseError> {
         self.consume(TokenType::LeftParen, ParseError::WhileStmtLeftParenExpected)?;
         let condition = Box::new(self.expression_list()?);
-        self.consume(TokenType::RightParen, ParseError::WhileStmtRightParenExpected)?;
+        self.consume(
+            TokenType::RightParen,
+            ParseError::WhileStmtRightParenExpected,
+        )?;
         let body = Box::new(self.statement()?);
 
         Ok(Stmt::While(WhileStmt { condition, body }))
