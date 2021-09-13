@@ -11,6 +11,9 @@ use crate::{
 
 #[derive(Debug, Error)]
 pub enum ParseError {
+    #[error("Break statement outside of a loop")]
+    BreakOutsideOfLoop,
+
     #[error("Expect ':' in ternary operator")]
     ColonExpectedInTernary,
 
@@ -57,6 +60,7 @@ pub enum ParseError {
 pub struct Parser<'a> {
     tokens: Vec<Token>,
     current: usize,
+    loop_depth: u32,
     error_reporter: &'a ErrorReporter,
 }
 
@@ -65,6 +69,7 @@ impl<'a> Parser<'a> {
         Parser {
             tokens,
             current: 0,
+            loop_depth: 0,
             error_reporter,
         }
     }
@@ -109,8 +114,14 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.match_any(&[TokenType::Break]) {
+            return self.break_statement();
+        }
         if self.match_any(&[TokenType::For]) {
-            return self.for_statement();
+            self.loop_depth += 1;
+            let result = self.for_statement();
+            self.loop_depth -= 1;
+            return result;
         }
         if self.match_any(&[TokenType::If]) {
             return self.if_statement();
@@ -119,12 +130,23 @@ impl<'a> Parser<'a> {
             return self.print_statement();
         }
         if self.match_any(&[TokenType::While]) {
-            return self.while_statement();
+            self.loop_depth += 1;
+            let result = self.while_statement();
+            self.loop_depth -= 1;
+            return result;
         }
         if self.match_any(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block(self.block()?));
         }
         self.expression_statement()
+    }
+
+    fn break_statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.loop_depth == 0 {
+            return Err(self.error(ParseError::BreakOutsideOfLoop));
+        }
+        self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
+        Ok(Stmt::Break)
     }
 
     fn for_statement(&mut self) -> Result<Stmt, ParseError> {

@@ -18,6 +18,7 @@ impl<'a> Scanner<'a> {
     pub fn new(src: &str, error_reporter: &'a ErrorReporter) -> Self {
         let mut kw_map: HashMap<String, TokenType> = HashMap::new();
         kw_map.insert("and".to_string(), TokenType::And);
+        kw_map.insert("break".to_string(), TokenType::Break);
         kw_map.insert("class".to_string(), TokenType::Class);
         kw_map.insert("else".to_string(), TokenType::Else);
         kw_map.insert("false".to_string(), TokenType::False);

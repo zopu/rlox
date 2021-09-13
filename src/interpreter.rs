@@ -61,6 +61,10 @@ impl TryFrom<&TokenLiteral> for LoxValue {
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
+    // This isn't really an error :-(
+    #[error("Breaking out of a loop")]
+    Breaking,
+
     #[error("Operands must be numbers")]
     OperandsMustBeNumbers,
 
@@ -92,7 +96,10 @@ impl<'a> Interpreter<'a> {
 
     pub fn interpret(&mut self, stmts: &[Stmt]) {
         for stmt in stmts {
-            self.evaluate_stmt(&stmt).unwrap_or(());
+            let result = self.evaluate_stmt(&stmt);
+            if result.is_err() {
+                return;
+            }
         }
     }
 
@@ -109,6 +116,7 @@ impl<'a> Interpreter<'a> {
                 self.execute_block(vec)?;
                 Ok(())
             }
+            Stmt::Break => Err(RuntimeError::Breaking),
             Stmt::Expression(e) => {
                 self.evaluate_expr(e)?;
                 Ok(())
@@ -129,7 +137,14 @@ impl<'a> Interpreter<'a> {
             }
             Stmt::While(WhileStmt { condition, body }) => {
                 while is_truthy(&self.evaluate_expr(&condition)?) {
-                    self.evaluate_stmt(body)?;
+                    let result = self.evaluate_stmt(body);
+                    if let Err(e) = result {
+                        if let RuntimeError::Breaking = e {
+                            return Ok(());
+                        } else {
+                            return Err(e);
+                        }
+                    }
                 }
                 Ok(())
             }

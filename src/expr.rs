@@ -3,6 +3,7 @@ use crate::tokens::{Token, TokenLiteral};
 #[derive(Debug)]
 pub enum Stmt {
     Block(Vec<Stmt>),
+    Break,
     Expression(Expr),
     If(IfStmt),
     Print(Expr),
@@ -78,6 +79,7 @@ impl PrettyPrinter {
                 }
                 s
             }
+            Stmt::Break => "break;".to_string(),
             Stmt::Expression(e) => self.print_expr(e),
             Stmt::If(e) => {
                 let mut s = "if (".to_string();

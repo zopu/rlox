@@ -4,7 +4,7 @@ line
 1.23
 comment */
 
-print "hello, world!";
+print "Running LOX tests";
 
 var foo = 3;
 var result = 1 + (foo * 2);
@@ -56,4 +56,12 @@ cnt = 0;
 for (;cnt < 10;) {
     cnt = cnt + 1;
 }
-print "Should be 9: " + 9;
+print "Should be 10: " + cnt + " (for loops)";
+
+// Test breaking
+cnt = 0;
+for (var i = 0; i < 10; i = i + 1) {
+    cnt = cnt + 1;
+    if (i >= 5) break;
+}
+print "Should be 6: " + cnt + " (breaking)";
