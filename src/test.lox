@@ -65,3 +65,11 @@ for (var i = 0; i < 10; i = i + 1) {
     if (i >= 5) break;
 }
 print "Should be 6: " + cnt + " (breaking)";
+
+// Test builtin function call
+var systime = clock();
+if (systime > 1000 and systime < 2000000000) {
+    print "ok (builtin function call)";
+} else {
+    print "ERROR with system time builtin";
+}

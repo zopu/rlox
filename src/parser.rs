@@ -3,8 +3,8 @@ use thiserror::Error;
 use crate::{
     errors::ErrorReporter,
     expr::{
-        self, AssignExpr, BinaryExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt,
-        WhileStmt,
+        self, AssignExpr, BinaryExpr, CallExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr,
+        VarStmt, WhileStmt,
     },
     tokens::{Token, TokenLiteral, TokenType},
 };
@@ -13,6 +13,12 @@ use crate::{
 pub enum ParseError {
     #[error("Break statement outside of a loop")]
     BreakOutsideOfLoop,
+
+    #[error("Expect ')' after arguments")]
+    CallRightParenExpected,
+
+    #[error("Can't have > 255 arguments")]
+    CallTooManyArgs,
 
     #[error("Expect ':' in ternary operator")]
     ColonExpectedInTernary,
@@ -391,8 +397,42 @@ impl<'a> Parser<'a> {
                 right: Box::new(self.unary()?),
             }))
         } else {
-            self.primary()
+            self.call()
         }
+    }
+
+    fn call(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_any(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, ParseError> {
+        let mut arguments: Vec<Expr> = vec![];
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    return Err(self.error_at(self.peek(), ParseError::CallTooManyArgs));
+                }
+                arguments.push(self.expression()?);
+                if !self.match_any(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        let paren = self.consume(TokenType::RightParen, ParseError::CallRightParenExpected)?;
+        Ok(Expr::Call(CallExpr {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        }))
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {

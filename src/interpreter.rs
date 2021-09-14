@@ -1,10 +1,10 @@
-use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc, sync::Arc, time::SystemTime};
 use thiserror::Error;
 
 use crate::{
     env::Environment,
     errors::ErrorReporter,
-    expr::{Expr, Stmt, WhileStmt},
+    expr::{CallExpr, Expr, Stmt, WhileStmt},
     tokens::{Token, TokenLiteral, TokenType},
 };
 
@@ -14,6 +14,7 @@ pub enum LoxValue {
     Boolean(bool),
     Number(f64),
     String(String),
+    Callable(Callable),
 }
 
 impl Display for LoxValue {
@@ -29,6 +30,9 @@ impl Display for LoxValue {
                     f.write_str("false")?;
                 }
             }
+            LoxValue::Callable(_) => {
+                f.write_str("(callable)")?;
+            }
             LoxValue::Number(n) => {
                 f.write_fmt(format_args!("{}", n))?;
             }
@@ -37,6 +41,59 @@ impl Display for LoxValue {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Callable {
+    Native(NativeFn),
+}
+
+impl Callable {
+    pub fn call(
+        &self,
+        _interpreter: &mut Interpreter,
+        args: &[LoxValue],
+    ) -> Result<LoxValue, RuntimeError> {
+        match &self {
+            Callable::Native(nfn) => nfn.call(args),
+        }
+    }
+
+    pub fn arity(&self) -> usize {
+        match &self {
+            Callable::Native(nfn) => nfn.arity,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeFn {
+    arity: usize,
+    code: Arc<dyn Fn(&[LoxValue]) -> Result<LoxValue, RuntimeError>>,
+}
+
+impl NativeFn {
+    pub fn call(&self, args: &[LoxValue]) -> Result<LoxValue, RuntimeError> {
+        if args.len() != self.arity {
+            return Err(RuntimeError::CallWrongNumberOfArgs);
+        }
+        (self.code)(args)
+    }
+}
+
+impl std::fmt::Debug for NativeFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NativeFn")
+            .field("arity", &self.arity)
+            .finish()
+    }
+}
+
+impl PartialEq for NativeFn {
+    // Two native functions are never equal. This might not be right long-term...
+    fn eq(&self, _other: &Self) -> bool {
+        false
     }
 }
 
@@ -65,6 +122,12 @@ pub enum RuntimeError {
     #[error("Breaking out of a loop")]
     Breaking,
 
+    #[error("Can only call functions and classes")]
+    CallOnNonCallable,
+
+    #[error("Wrong number of function arguments")]
+    CallWrongNumberOfArgs,
+
     #[error("Operands must be numbers")]
     OperandsMustBeNumbers,
 
@@ -88,8 +151,23 @@ pub struct Interpreter<'a> {
 
 impl<'a> Interpreter<'a> {
     pub fn new(error_reporter: &'a ErrorReporter) -> Self {
+        let globals = Rc::new(RefCell::new(Environment::new(None)));
+
+        globals.borrow_mut().define(
+            "clock",
+            LoxValue::Callable(Callable::Native(NativeFn {
+                arity: 0,
+                code: Arc::new(move |_args| -> Result<LoxValue, RuntimeError> {
+                    let time = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap();
+                    Ok(LoxValue::Number(time.as_secs() as f64))
+                }),
+            })),
+        );
+
         Interpreter {
-            env: Rc::new(RefCell::new(Environment::new(None))),
+            env: globals,
             error_reporter,
         }
     }
@@ -186,6 +264,35 @@ impl<'a> Interpreter<'a> {
                 let left = self.evaluate_expr(binary.left.as_ref())?;
                 let right = self.evaluate_expr(binary.right.as_ref())?;
                 self.evaluate_binary(&binary.operator, &left, &right)
+            }
+            Expr::Call(CallExpr {
+                callee,
+                paren: _,
+                arguments,
+            }) => {
+                let callee = self.evaluate_expr(&callee)?;
+
+                let args: Vec<LoxValue> = arguments
+                    .iter()
+                    .map(|a| self.evaluate_expr(a).unwrap_or(LoxValue::Nil))
+                    .collect();
+                if let LoxValue::Callable(c) = callee {
+                    if args.len() != c.arity() {
+                        self.error_reporter.runtime_error(
+                            0,
+                            &("Expected ".to_string()
+                                + &c.arity().to_string()
+                                + " arguments but got "
+                                + &args.len().to_string()),
+                        );
+                        return Err(RuntimeError::CallWrongNumberOfArgs);
+                    }
+                    Ok(c.call(self, &args)?)
+                } else {
+                    self.error_reporter
+                        .runtime_error(0, &RuntimeError::CallOnNonCallable.to_string());
+                    Err(RuntimeError::CallOnNonCallable)
+                }
             }
             Expr::Grouping(e) => self.evaluate_expr(e.as_ref()),
             Expr::Literal(l) => Ok(LoxValue::try_from(l).unwrap_or(LoxValue::Nil)),

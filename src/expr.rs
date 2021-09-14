@@ -15,6 +15,7 @@ pub enum Stmt {
 pub enum Expr {
     Assign(AssignExpr),
     Binary(BinaryExpr),
+    Call(CallExpr),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Logical(LogicalExpr),
@@ -52,6 +53,13 @@ pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct CallExpr {
+    pub callee: Box<Expr>,
+    pub paren: Token, // Closing paren (So we have it's location for errors)
+    pub arguments: Vec<Expr>,
 }
 
 #[derive(Debug)]
@@ -125,6 +133,19 @@ impl PrettyPrinter {
                 s
             }
             Expr::Binary(e) => self.parenthesize(&e.operator.lexeme, &[&e.left, &e.right]),
+            Expr::Call(CallExpr {
+                callee,
+                paren: _,
+                arguments,
+            }) => {
+                let mut s = self.print_expr(&callee);
+                s.push_str("(");
+                for arg in arguments {
+                    s.push_str(&self.print_expr(&arg));
+                }
+                s.push_str(")");
+                s
+            }
             Expr::Grouping(b) => {
                 let e = b.as_ref();
                 self.parenthesize("group", &[e])
