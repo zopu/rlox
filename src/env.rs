@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::interpreter::{LoxValue, RuntimeError};
+use crate::{interpreter::RuntimeError, loxvalue::LoxValue};
 
 pub struct Environment {
     enclosing: Option<Rc<RefCell<Environment>>>,

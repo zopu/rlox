@@ -8,6 +8,7 @@ use clap::{App, Arg};
 mod env;
 mod expr;
 mod interpreter;
+mod loxvalue;
 mod parser;
 mod scanner;
 mod tokens;
