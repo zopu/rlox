@@ -2,9 +2,9 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc, sync::Arc, time::SystemTime};
 use thiserror::Error;
 
 use crate::{
+    ast::{CallExpr, Expr, Stmt, WhileStmt},
     env::Environment,
     errors::ErrorReporter,
-    expr::{CallExpr, Expr, Stmt, WhileStmt},
     loxvalue::{Callable, LoxValue, NativeFn},
     tokens::{Token, TokenType},
 };

@@ -1,11 +1,11 @@
 use thiserror::Error;
 
 use crate::{
-    errors::ErrorReporter,
-    expr::{
-        self, AssignExpr, BinaryExpr, CallExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr,
-        VarStmt, WhileStmt,
+    ast::{
+        AssignExpr, BinaryExpr, CallExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt,
+        WhileStmt,
     },
+    errors::ErrorReporter,
     tokens::{Token, TokenLiteral, TokenType},
 };
 
@@ -113,7 +113,7 @@ impl<'a> Parser<'a> {
             initializer = self.expression()?;
         }
         self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
-        Ok(expr::Stmt::Var(VarStmt {
+        Ok(Stmt::Var(VarStmt {
             name,
             initializer: Box::new(initializer),
         }))

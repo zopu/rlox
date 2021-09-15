@@ -5,8 +5,8 @@ use std::io::Write;
 
 use clap::{App, Arg};
 
+mod ast;
 mod env;
-mod expr;
 mod interpreter;
 mod loxvalue;
 mod parser;
@@ -16,7 +16,7 @@ mod tokens;
 use scanner::Scanner;
 use tokens::Token;
 
-use crate::expr::PrettyPrinter;
+use crate::ast::PrettyPrinter;
 
 mod errors {
     use crate::tokens::{Token, TokenType};
