@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{
-        AssignExpr, BinaryExpr, CallExpr, Expr, IfStmt, LogicalExpr, Stmt, UnaryExpr, VarStmt,
-        WhileStmt,
+        AssignExpr, BinaryExpr, CallExpr, Expr, FunctionStmt, IfStmt, LogicalExpr, Stmt, UnaryExpr,
+        VarStmt, WhileStmt,
     },
     errors::ErrorReporter,
     tokens::{Token, TokenLiteral, TokenType},
@@ -34,6 +34,24 @@ pub enum ParseError {
 
     #[error("Expect ';' in for statement after loop condition")]
     ForStmtSemiColonExpected,
+
+    #[error("Expect '{{' before function body")]
+    FunctionExpectBlockOpen,
+
+    #[error("Expect function name")]
+    FunctionExpectIdentifier,
+
+    #[error("Expect '(' after function name")]
+    FunctionExpectLeftParen,
+
+    #[error("Expect parameter name")]
+    FunctionExpectParamName,
+
+    #[error("Expect ')' after function parameters")]
+    FunctionExpectRightParen,
+
+    #[error("Too many arguments in function declaration")]
+    FunctionTooManyArgs,
 
     #[error("Expect '(' after if")]
     IfStmtLeftParenExpected,
@@ -95,7 +113,9 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self) -> Result<Stmt, ParseError> {
-        let stmt_result = if self.match_any(&[TokenType::Var]) {
+        let stmt_result = if self.match_any(&[TokenType::Fun]) {
+            self.function()
+        } else if self.match_any(&[TokenType::Var]) {
             self.var_declaration()
         } else {
             self.statement()
@@ -104,6 +124,29 @@ impl<'a> Parser<'a> {
             self.synchronize();
         }
         stmt_result
+    }
+
+    fn function(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, ParseError::FunctionExpectIdentifier)?;
+        self.consume(TokenType::LeftParen, ParseError::FunctionExpectLeftParen)?;
+        let mut params = Vec::<Token>::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if params.len() > 255 {
+                    return Err(self.error_at(self.peek(), ParseError::FunctionTooManyArgs));
+                }
+                params.push(
+                    self.consume(TokenType::Identifier, ParseError::FunctionExpectParamName)?,
+                );
+                if !self.match_any(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, ParseError::FunctionExpectRightParen)?;
+        self.consume(TokenType::LeftBrace, ParseError::FunctionExpectBlockOpen)?;
+        let body = self.block()?;
+        Ok(Stmt::Function(FunctionStmt { name, params, body }))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, ParseError> {

@@ -73,3 +73,8 @@ if (systime > 1000 and systime < 2000000000) {
 } else {
     print "ERROR with system time builtin";
 }
+
+fun mytestfunction (str) {
+    print str;
+}
+mytestfunction("ok");

@@ -1,17 +1,18 @@
 use crate::tokens::{Token, TokenLiteral};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Stmt {
     Block(Vec<Stmt>),
     Break,
     Expression(Expr),
+    Function(FunctionStmt),
     If(IfStmt),
     Print(Expr),
     While(WhileStmt),
     Var(VarStmt),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     Assign(AssignExpr),
     Binary(BinaryExpr),
@@ -23,53 +24,60 @@ pub enum Expr {
     Variable(Token),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+pub struct FunctionStmt {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+#[derive(Clone, Debug)]
 pub struct IfStmt {
     pub condition: Box<Expr>,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WhileStmt {
     pub condition: Box<Expr>,
     pub body: Box<Stmt>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VarStmt {
     pub name: Token,
     pub initializer: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AssignExpr {
     pub name: Token,
     pub value: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CallExpr {
     pub callee: Box<Expr>,
     pub paren: Token, // Closing paren (So we have it's location for errors)
     pub arguments: Vec<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LogicalExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub right: Box<Expr>,
@@ -89,6 +97,19 @@ impl PrettyPrinter {
             }
             Stmt::Break => "break;".to_string(),
             Stmt::Expression(e) => self.print_expr(e),
+            Stmt::Function(FunctionStmt { name, params, body }) => {
+                let mut s = "fun ".to_string();
+                s.push_str(&name.lexeme);
+                for p in params {
+                    s.push_str(&p.lexeme)
+                }
+                s.push('{');
+                for stmt in body {
+                    s.push_str(&self.print_stmt(stmt));
+                }
+                s.push('}');
+                s
+            }
             Stmt::If(e) => {
                 let mut s = "if (".to_string();
                 s.push_str(&self.print_expr(&e.condition));

@@ -39,6 +39,7 @@ pub enum RuntimeError {
 
 pub struct Interpreter<'a> {
     env: Rc<RefCell<Environment>>,
+    globals: Rc<RefCell<Environment>>,
     error_reporter: &'a ErrorReporter,
 }
 
@@ -60,9 +61,14 @@ impl<'a> Interpreter<'a> {
         );
 
         Interpreter {
-            env: globals,
+            env: globals.clone(),
+            globals,
             error_reporter,
         }
+    }
+
+    pub fn globals(&mut self) -> Rc<RefCell<Environment>> {
+        self.globals.clone()
     }
 
     pub fn interpret(&mut self, stmts: &[Stmt]) {
@@ -84,12 +90,18 @@ impl<'a> Interpreter<'a> {
     pub fn evaluate_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Block(vec) => {
-                self.execute_block(vec)?;
+                let block_env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
+                self.execute_block(vec, block_env)?;
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Breaking),
             Stmt::Expression(e) => {
                 self.evaluate_expr(e)?;
+                Ok(())
+            }
+            Stmt::Function(stmt) => {
+                let callable = LoxValue::Callable(Callable::Function(stmt.clone()));
+                self.env.borrow_mut().define(&stmt.name.lexeme, callable);
                 Ok(())
             }
             Stmt::If(e) => {
@@ -127,10 +139,12 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn execute_block(&mut self, stmts: &[Stmt]) -> Result<(), RuntimeError> {
-        let block_env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
-        self.env = block_env;
-
+    pub fn execute_block(
+        &mut self,
+        stmts: &[Stmt],
+        env: Rc<RefCell<Environment>>,
+    ) -> Result<(), RuntimeError> {
+        self.env = env;
         for stmt in stmts {
             let result = self.evaluate_stmt(stmt);
             if let Err(e) = result {

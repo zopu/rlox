@@ -1,6 +1,8 @@
-use std::{convert::TryFrom, fmt::Display, sync::Arc};
+use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc, sync::Arc};
 
 use crate::{
+    ast::FunctionStmt,
+    env::Environment,
     interpreter::{Interpreter, RuntimeError},
     tokens::TokenLiteral,
 };
@@ -41,25 +43,62 @@ impl Display for LoxValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Callable {
+    Function(FunctionStmt),
     Native(NativeFn),
 }
 
 impl Callable {
     pub fn call(
         &self,
-        _interpreter: &mut Interpreter,
+        interpreter: &mut Interpreter,
         args: &[LoxValue],
     ) -> Result<LoxValue, RuntimeError> {
         match &self {
             Callable::Native(nfn) => nfn.call(args),
+            Callable::Function(FunctionStmt {
+                name: _,
+                params,
+                body,
+            }) => {
+                let env = Rc::new(RefCell::new(Environment::new(Some(interpreter.globals()))));
+                if args.len() != params.len() {
+                    return Err(RuntimeError::CallWrongNumberOfArgs);
+                }
+                for i in 0..args.len() {
+                    env.borrow_mut().define(&params[i].lexeme, args[i].clone());
+                }
+                interpreter.execute_block(body, env)?;
+                Ok(LoxValue::Nil)
+            }
         }
     }
 
     pub fn arity(&self) -> usize {
         match &self {
             Callable::Native(nfn) => nfn.arity,
+            Callable::Function(FunctionStmt {
+                name: _,
+                params,
+                body: _,
+            }) => params.len(),
+        }
+    }
+}
+
+impl Display for Callable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Callable::Function(FunctionStmt {
+                name,
+                params: _,
+                body: _,
+            }) => {
+                f.write_str("fun ")?;
+                f.write_str(&name.lexeme)
+            }
+            Callable::Native(_) => f.write_str("<builtin function>"),
         }
     }
 }
@@ -87,7 +126,7 @@ impl std::fmt::Debug for NativeFn {
     }
 }
 
-impl PartialEq for NativeFn {
+impl PartialEq for Callable {
     // Two native functions are never equal. This might not be right long-term...
     fn eq(&self, _other: &Self) -> bool {
         false
