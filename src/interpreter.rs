@@ -2,7 +2,7 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc, sync::Arc, time::SystemTime};
 use thiserror::Error;
 
 use crate::{
-    ast::{CallExpr, Expr, Stmt, WhileStmt},
+    ast::{CallExpr, Expr, ReturnStmt, Stmt, WhileStmt},
     env::Environment,
     errors::ErrorReporter,
     loxvalue::{Callable, LoxValue, NativeFn},
@@ -14,6 +14,10 @@ pub enum RuntimeError {
     // This isn't really an error :-(
     #[error("Breaking out of a loop")]
     Breaking,
+
+    // Nor this :-(
+    #[error("Returning from function")]
+    Return(LoxValue),
 
     #[error("Can only call functions and classes")]
     CallOnNonCallable,
@@ -117,6 +121,10 @@ impl<'a> Interpreter<'a> {
                 let val = self.evaluate_expr(e)?;
                 println!("{}", val);
                 Ok(())
+            }
+            Stmt::Return(ReturnStmt { keyword: _, value }) => {
+                let val = self.evaluate_expr(value)?;
+                Err(RuntimeError::Return(val))
             }
             Stmt::While(WhileStmt { condition, body }) => {
                 while is_truthy(&self.evaluate_expr(&condition)?) {

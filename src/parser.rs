@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{
-        AssignExpr, BinaryExpr, CallExpr, Expr, FunctionStmt, IfStmt, LogicalExpr, Stmt, UnaryExpr,
-        VarStmt, WhileStmt,
+        AssignExpr, BinaryExpr, CallExpr, Expr, FunctionStmt, IfStmt, LogicalExpr, ReturnStmt,
+        Stmt, UnaryExpr, VarStmt, WhileStmt,
     },
     errors::ErrorReporter,
     tokens::{Token, TokenLiteral, TokenType},
@@ -178,6 +178,9 @@ impl<'a> Parser<'a> {
         if self.match_any(&[TokenType::Print]) {
             return self.print_statement();
         }
+        if self.match_any(&[TokenType::Return]) {
+            return self.return_statement();
+        }
         if self.match_any(&[TokenType::While]) {
             self.loop_depth += 1;
             let result = self.while_statement();
@@ -258,6 +261,19 @@ impl<'a> Parser<'a> {
         let expr = self.expression_list()?;
         self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
         Ok(Stmt::Print(expr))
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let keyword = self.previous();
+        let mut value = Expr::Literal(TokenLiteral::Nil);
+        if !self.check(&TokenType::SemiColon) {
+            value = self.expression_list()?;
+        }
+        self.consume(TokenType::SemiColon, ParseError::SemiColonExpected)?;
+        Ok(Stmt::Return(ReturnStmt {
+            keyword,
+            value: Box::new(value),
+        }))
     }
 
     fn while_statement(&mut self) -> Result<Stmt, ParseError> {

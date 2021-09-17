@@ -78,3 +78,9 @@ fun mytestfunction (str) {
     print str;
 }
 mytestfunction("ok");
+
+fun mytestfunction2 (n) {
+    return n + 2;
+}
+
+print "Should be 4: " + mytestfunction2(2) + " (return statement)";

@@ -8,6 +8,7 @@ pub enum Stmt {
     Function(FunctionStmt),
     If(IfStmt),
     Print(Expr),
+    Return(ReturnStmt),
     While(WhileStmt),
     Var(VarStmt),
 }
@@ -36,6 +37,12 @@ pub struct IfStmt {
     pub condition: Box<Expr>,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReturnStmt {
+    pub keyword: Token,
+    pub value: Box<Expr>,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +131,12 @@ impl PrettyPrinter {
             Stmt::Print(e) => {
                 let mut s = "print ".to_string();
                 s.push_str(&self.print_expr(e));
+                s.push_str(";");
+                s
+            }
+            Stmt::Return(ReturnStmt { keyword: _, value }) => {
+                let mut s = "return ".to_string();
+                s.push_str(&self.print_expr(value));
                 s.push_str(";");
                 s
             }

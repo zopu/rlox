@@ -69,8 +69,11 @@ impl Callable {
                 for i in 0..args.len() {
                     env.borrow_mut().define(&params[i].lexeme, args[i].clone());
                 }
-                interpreter.execute_block(body, env)?;
-                Ok(LoxValue::Nil)
+                match interpreter.execute_block(body, env) {
+                    Ok(()) => Ok(LoxValue::Nil),
+                    Err(RuntimeError::Return(val)) => Ok(val),
+                    Err(e) => Err(e),
+                }
             }
         }
     }
