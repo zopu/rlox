@@ -45,11 +45,18 @@ impl Display for LoxValue {
 
 #[derive(Clone, Debug)]
 pub enum Callable {
-    Function(FunctionStmt),
+    Function(Function),
     Native(NativeFn),
 }
 
 impl Callable {
+    pub fn new_function(declaration: FunctionStmt, closure: Rc<RefCell<Environment>>) -> Callable {
+        Callable::Function(Function {
+            code: declaration,
+            closure,
+        })
+    }
+
     pub fn call(
         &self,
         interpreter: &mut Interpreter,
@@ -57,12 +64,16 @@ impl Callable {
     ) -> Result<LoxValue, RuntimeError> {
         match &self {
             Callable::Native(nfn) => nfn.call(args),
-            Callable::Function(FunctionStmt {
-                name: _,
-                params,
-                body,
+            Callable::Function(Function {
+                code:
+                    FunctionStmt {
+                        name: _,
+                        params,
+                        body,
+                    },
+                closure,
             }) => {
-                let env = Rc::new(RefCell::new(Environment::new(Some(interpreter.globals()))));
+                let env = Rc::new(RefCell::new(Environment::new(Some(closure.clone()))));
                 if args.len() != params.len() {
                     return Err(RuntimeError::CallWrongNumberOfArgs);
                 }
@@ -81,10 +92,14 @@ impl Callable {
     pub fn arity(&self) -> usize {
         match &self {
             Callable::Native(nfn) => nfn.arity,
-            Callable::Function(FunctionStmt {
-                name: _,
-                params,
-                body: _,
+            Callable::Function(Function {
+                code:
+                    FunctionStmt {
+                        name: _,
+                        params,
+                        body: _,
+                    },
+                closure: _,
             }) => params.len(),
         }
     }
@@ -93,10 +108,14 @@ impl Callable {
 impl Display for Callable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Callable::Function(FunctionStmt {
-                name,
-                params: _,
-                body: _,
+            Callable::Function(Function {
+                code:
+                    FunctionStmt {
+                        name,
+                        params: _,
+                        body: _,
+                    },
+                closure: _,
             }) => {
                 f.write_str("fun ")?;
                 f.write_str(&name.lexeme)
@@ -104,6 +123,12 @@ impl Display for Callable {
             Callable::Native(_) => f.write_str("<builtin function>"),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub code: FunctionStmt,
+    closure: Rc<RefCell<Environment>>,
 }
 
 #[derive(Clone)]

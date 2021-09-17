@@ -43,7 +43,6 @@ pub enum RuntimeError {
 
 pub struct Interpreter<'a> {
     env: Rc<RefCell<Environment>>,
-    globals: Rc<RefCell<Environment>>,
     error_reporter: &'a ErrorReporter,
 }
 
@@ -65,14 +64,9 @@ impl<'a> Interpreter<'a> {
         );
 
         Interpreter {
-            env: globals.clone(),
-            globals,
+            env: globals,
             error_reporter,
         }
-    }
-
-    pub fn globals(&mut self) -> Rc<RefCell<Environment>> {
-        self.globals.clone()
     }
 
     pub fn interpret(&mut self, stmts: &[Stmt]) {
@@ -104,8 +98,10 @@ impl<'a> Interpreter<'a> {
                 Ok(())
             }
             Stmt::Function(stmt) => {
-                let callable = LoxValue::Callable(Callable::Function(stmt.clone()));
-                self.env.borrow_mut().define(&stmt.name.lexeme, callable);
+                let callable = Callable::new_function(stmt.clone(), self.env.clone());
+                self.env
+                    .borrow_mut()
+                    .define(&stmt.name.lexeme, LoxValue::Callable(callable));
                 Ok(())
             }
             Stmt::If(e) => {
