@@ -1,100 +1,161 @@
-/* a + b
-Multi
-line
-1.23
-comment */
+/*
+* Lox Language Test
+*/
 
-print "Running LOX tests";
+var failures = 0;
 
-var foo = 3;
-var result = 1 + (foo * 2);
-print "Should be 7: " + result;
+fun print_assertion_failure(msg) {
+    failures = failures + 1;
+    print "--------";
+    print "Assertion failed!";
+    print msg;
+    print "--------";
+}
 
-var bar = foo * 2;
-var baz = 3;
-{
-    var bar = 4;
-    print "Should be 4: " + bar;
+fun assert(expr, msg) {
+    if (!expr) {
+        print_assertion_failure(msg);    
+    }
+    return expr;
+}
+
+fun assert_eq(a, b) {
+    if (a != b) {
+        print_assertion_failure("Expected '" + a + "' but got '" + b + "'");
+    }
+}
+
+fun fail(msg) {
+    print_assertion_failure(msg);
+}
+
+var test_count = 0;
+
+fun run_test(name, fn) {
+    test_count = test_count + 1;
+    print "-- " + name;
+    fn();
+}
+
+/* ---- Test infra functions above here ---- */
+
+print "==Running LOX tests==";
+
+fun test_basic_expressions() {
+    var foo = 3;
+    var result = 1 + (foo * 2);
+    assert_eq(7, result);
+}
+run_test("Basic Assertions", test_basic_expressions);
+
+fun test_blocks_and_scopes() {
+    var foo = 3;
+    var bar = foo * 2;
+    var baz = 3;
     {
-        baz = 8;
+        var bar = 4;
+        assert_eq(4, bar);
+        {
+            baz = 8;
+        }
+    }
+    assert_eq(6, bar);
+    assert_eq(3, foo);
+    assert_eq(8, baz);
+}
+run_test("Blocks, Scoping and Shadowing", test_blocks_and_scopes);
+
+fun test_if_else() {
+    if (1 <= 2) {
+        // Do nothing
+    } else {
+        fail("Control flow is incorrect");
     }
 }
-print "Should be 6: " + bar;
-print "Should be 3: " + foo;
-print "Should be 8: " + baz;
+run_test("If/Else", test_if_else);
 
-if (1 <= 2) {
-    print "ok";
-} else {
-    print "FAIL";
+fun test_logical_operators() {
+    assert_eq("ok", "ok" or "not ok");
+    assert_eq("ok", "not ok" and "ok");
+    assert_eq("ok", true and "ok");
+    assert_eq("ok", false or "ok");
+    if (false or false) fail("false or false was true");
 }
+run_test("Logical Operators", test_logical_operators);
 
-print "ok" or "not ok";
-print "not ok" and "ok";
-print true and "ok" ;
-print false or "ok";
-if (false or false) print "not ok";
-else {
-    print "ok";
-}
-
-var whileTest = 0;
-var counter = 10;
-while (counter > 0) {
-    whileTest = whileTest + 1;
-    counter = counter - 1;
-}
-print "Should be 10: " + whileTest;
-
-var cnt = 0;
-for (var i = 0; i <= 50; i = i + 1) {
-    cnt = cnt + i;
-}
-print "Should be 1275: " + cnt;
-
-cnt = 0;
-for (;cnt < 10;) {
-    cnt = cnt + 1;
-}
-print "Should be 10: " + cnt + " (for loops)";
-
-// Test breaking
-cnt = 0;
-for (var i = 0; i < 10; i = i + 1) {
-    cnt = cnt + 1;
-    if (i >= 5) break;
-}
-print "Should be 6: " + cnt + " (breaking)";
-
-// Test builtin function call
-var systime = clock();
-if (systime > 1000 and systime < 2000000000) {
-    print "ok (builtin function call)";
-} else {
-    print "ERROR with system time builtin";
-}
-
-fun mytestfunction (str) {
-    print str;
-}
-mytestfunction("ok");
-
-fun mytestfunction2 (n) {
-    return n + 2;
-}
-
-print "Should be 4: " + mytestfunction2(2) + " (return statement)";
-
-fun makeCounter() {
-    var i = 0;
-    fun count() {
-        i = i + 1;
-        return i;
+fun test_while() {
+    var whileTest = 0;
+    var counter = 10;
+    while (counter > 0) {
+        whileTest = whileTest + 1;
+        counter = counter - 1;
     }
-    return count;
+    assert_eq(10, whileTest);
 }
+run_test("While Loops", test_while);
 
-var counter = makeCounter();
-counter();
-counter();
-print "Should be 3: " + counter();
+
+fun test_for() {
+    var cnt = 0;
+    for (var i = 0; i <= 50; i = i + 1) {
+        cnt = cnt + i;
+    }
+    assert_eq(1275, cnt);
+    cnt = 0;
+    for (;cnt < 10;) {
+        cnt = cnt + 1;
+    }
+    assert_eq(10, cnt);
+}
+run_test("For Loops", test_for);
+
+fun test_break() {
+    var cnt = 0;
+    for (var i = 0; i < 10; i = i + 1) {
+        cnt = cnt + 1;
+        if (i >= 5) break;
+    }
+    assert_eq(6, cnt);
+}
+run_test("Breaking out of loops", test_break);
+
+fun test_builtin_fn() {
+    var systime = clock();
+    if (systime > 1000 and systime < 2000000000) {
+        // All ok
+    } else {
+        fail("system time not within expected bounds");
+    }
+}
+run_test("Builtin function call", test_builtin_fn);
+
+fun test_function_return() {
+    fun mytestfunction (n) {
+        return n + 2;
+    }
+    assert_eq(4, mytestfunction(2));
+}
+run_test("Function return statement", test_function_return);
+
+fun test_closures() {
+    fun makeCounter() {
+        var i = 0;
+        fun count() {
+            i = i + 1;
+            return i;
+        }
+        return count;
+    }
+
+    var counter = makeCounter();
+    counter();
+    counter();
+    assert_eq(3, counter());
+}
+run_test("Closures", test_closures);
+
+/* Summary of ran tests, to check that we actually ran stuff! */
+print "Ran " + test_count + " tests";
+if (failures > 0) {
+    print "Saw " + failures + " failures";
+}

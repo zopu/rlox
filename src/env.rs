@@ -16,10 +16,6 @@ impl Environment {
         }
     }
 
-    pub fn enclosing(&self) -> Option<Rc<RefCell<Environment>>> {
-        self.enclosing.clone()
-    }
-
     pub fn define(&mut self, name: &str, value: LoxValue) {
         self.values.insert(name.to_string(), value);
     }

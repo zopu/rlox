@@ -148,25 +148,17 @@ impl<'a> Interpreter<'a> {
         stmts: &[Stmt],
         env: Rc<RefCell<Environment>>,
     ) -> Result<(), RuntimeError> {
+        let previous_env = self.env.clone();
         self.env = env;
         for stmt in stmts {
             let result = self.evaluate_stmt(stmt);
             if let Err(e) = result {
-                self.close_scope();
+                self.env = previous_env;
                 return Err(e);
             }
         }
-        self.close_scope();
+        self.env = previous_env;
         Ok(())
-    }
-
-    fn close_scope(&mut self) {
-        let enclosing_env = self
-            .env
-            .borrow()
-            .enclosing()
-            .expect("This environment should not be the root environment");
-        self.env = enclosing_env;
     }
 
     fn evaluate_expr(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
