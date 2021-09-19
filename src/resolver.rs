@@ -119,9 +119,8 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
             Expr::Variable(token) => {
                 if let Some(scope) = self.scopes_stack.last() {
                     if let Some(false) = scope.get(&token.lexeme) {
-                        // TODO
-                        // Return an error here
-                        panic!("Variable is undefined");
+                        self.error_reporter
+                        .runtime_error(0, "Variable is undefined");
                     }
                 }
                 self.resolve_local(expr, token);
