@@ -62,6 +62,10 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 self.resolve_stmts_inner(stmts);
                 self.end_scope();
             }
+            Stmt::Class(stmt) => {
+                self.declare(&stmt.name.lexeme);
+                self.define(&stmt.name.lexeme);
+            }
             Stmt::Function(stmt) => {
                 self.declare(&stmt.name.lexeme);
                 self.define(&stmt.name.lexeme);
@@ -120,7 +124,7 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 if let Some(scope) = self.scopes_stack.last() {
                     if let Some(false) = scope.get(&token.lexeme) {
                         self.error_reporter
-                        .runtime_error(0, "Variable is undefined");
+                            .runtime_error(0, "Variable is undefined");
                     }
                 }
                 self.resolve_local(expr, token);

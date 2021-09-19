@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{
-        AssignExpr, BinaryExpr, CallExpr, Expr, FunctionStmt, IfStmt, LogicalExpr, ReturnStmt,
-        Stmt, UnaryExpr, VarStmt, WhileStmt,
+        AssignExpr, BinaryExpr, CallExpr, ClassStmt, Expr, FunctionStmt, IfStmt, LogicalExpr,
+        ReturnStmt, Stmt, UnaryExpr, VarStmt, WhileStmt,
     },
     errors::ErrorReporter,
     tokens::{Token, TokenLiteral, TokenType},
@@ -19,6 +19,15 @@ pub enum ParseError {
 
     #[error("Can't have > 255 arguments")]
     CallTooManyArgs,
+
+    #[error("Expect class name")]
+    ClassExpectIdentifier,
+
+    #[error("Expect '{{' after class name")]
+    ClassExpectLeftBrace,
+
+    #[error("Expect '}}' after class definition")]
+    ClassExpectRightBrace,
 
     #[error("Expect ':' in ternary operator")]
     ColonExpectedInTernary,
@@ -113,7 +122,9 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self) -> Result<Stmt, ParseError> {
-        let stmt_result = if self.match_any(&[TokenType::Fun]) {
+        let stmt_result = if self.match_any(&[TokenType::Class]) {
+            self.class_declaration()
+        } else if self.match_any(&[TokenType::Fun]) {
             self.function()
         } else if self.match_any(&[TokenType::Var]) {
             self.var_declaration()
@@ -124,6 +135,23 @@ impl<'a> Parser<'a> {
             self.synchronize();
         }
         stmt_result
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, ParseError::ClassExpectIdentifier)?;
+        self.consume(TokenType::LeftBrace, ParseError::ClassExpectLeftBrace)?;
+
+        let mut methods = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            methods.push(self.function()?);
+        }
+
+        self.consume(TokenType::RightBrace, ParseError::ClassExpectRightBrace)?;
+
+        Ok(Stmt::Class(ClassStmt {
+            name,
+            methods: vec![],
+        }))
     }
 
     fn function(&mut self) -> Result<Stmt, ParseError> {

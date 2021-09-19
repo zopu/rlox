@@ -14,6 +14,7 @@ pub enum LoxValue<'a> {
     Number(f64),
     String(String),
     Callable(Callable<'a>),
+    Class(LoxClass),
 }
 
 impl<'a> Display for LoxValue<'a> {
@@ -31,6 +32,9 @@ impl<'a> Display for LoxValue<'a> {
             }
             LoxValue::Callable(_) => {
                 f.write_str("(callable)")?;
+            }
+            LoxValue::Class(_) => {
+                f.write_str("(class)")?;
             }
             LoxValue::Number(n) => {
                 f.write_fmt(format_args!("{}", n))?;
@@ -164,6 +168,16 @@ impl<'a> PartialEq for Callable<'a> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct LoxClass {
+    name: String,
+}
+
+impl LoxClass {
+    pub fn new(name: String) -> LoxClass {
+        LoxClass { name }
+    }
+}
 pub struct LoxValueError {}
 
 impl<'a> TryFrom<&TokenLiteral> for LoxValue<'a> {

@@ -4,6 +4,7 @@ use crate::tokens::{Token, TokenLiteral};
 pub enum Stmt {
     Block(Vec<Stmt>),
     Break,
+    Class(ClassStmt),
     Expression(Expr),
     Function(FunctionStmt),
     If(IfStmt),
@@ -23,6 +24,12 @@ pub enum Expr {
     Logical(LogicalExpr),
     Unary(UnaryExpr),
     Variable(Token),
+}
+
+#[derive(Clone, Debug)]
+pub struct ClassStmt {
+    pub name: Token,
+    pub methods: Vec<FunctionStmt>,
 }
 
 #[derive(Clone, Debug)]
@@ -103,20 +110,18 @@ impl PrettyPrinter {
                 s
             }
             Stmt::Break => "break;".to_string(),
-            Stmt::Expression(e) => self.print_expr(e),
-            Stmt::Function(FunctionStmt { name, params, body }) => {
-                let mut s = "fun ".to_string();
+            Stmt::Class(ClassStmt { name, methods }) => {
+                let mut s = "class ".to_string();
                 s.push_str(&name.lexeme);
-                for p in params {
-                    s.push_str(&p.lexeme)
+                s.push_str(" { ");
+                for m in methods {
+                    s.push_str(&self.print_function_stmt(m));
                 }
-                s.push('{');
-                for stmt in body {
-                    s.push_str(&self.print_stmt(stmt));
-                }
-                s.push('}');
+                s.push_str(" } ");
                 s
             }
+            Stmt::Expression(e) => self.print_expr(e),
+            Stmt::Function(stmt) => self.print_function_stmt(stmt),
             Stmt::If(e) => {
                 let mut s = "if (".to_string();
                 s.push_str(&self.print_expr(&e.condition));
@@ -196,6 +201,20 @@ impl PrettyPrinter {
             Expr::Unary(e) => self.parenthesize(&e.operator.lexeme, &[&e.right]),
             Expr::Variable(token) => token.lexeme.clone(),
         }
+    }
+
+    fn print_function_stmt(&self, FunctionStmt { name, params, body }: &FunctionStmt) -> String {
+        let mut s = "fun ".to_string();
+        s.push_str(&name.lexeme);
+        for p in params {
+            s.push_str(&p.lexeme)
+        }
+        s.push('{');
+        for stmt in body {
+            s.push_str(&self.print_stmt(stmt));
+        }
+        s.push('}');
+        s
     }
 
     fn parenthesize(&self, name: &str, exprs: &[&Expr]) -> String {

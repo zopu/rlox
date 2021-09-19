@@ -4,10 +4,10 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    ast::{CallExpr, Expr, ReturnStmt, Stmt, WhileStmt},
+    ast::{CallExpr, ClassStmt, Expr, ReturnStmt, Stmt, WhileStmt},
     env::Environment,
     errors::ErrorReporter,
-    loxvalue::{Callable, LoxValue, NativeFn},
+    loxvalue::{Callable, LoxClass, LoxValue, NativeFn},
     tokens::{Token, TokenType},
 };
 
@@ -100,6 +100,12 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Breaking),
+            Stmt::Class(ClassStmt { name, methods: _ }) => {
+                let mut env = self.env.borrow_mut();
+                env.define(&name.lexeme, LoxValue::Nil);
+                let c = LoxClass::new(name.lexeme.clone());
+                env.assign(&name.lexeme, LoxValue::Class(c))
+            }
             Stmt::Expression(e) => {
                 self.evaluate_expr(e)?;
                 Ok(())

@@ -167,6 +167,17 @@ fun test_var_resolution() {
 }
 run_test("Variable Resolution", test_var_resolution);
 
+fun test_classes() {
+    var visited = false;
+    class foo {
+        bar() {
+            visited = true;
+        }
+    }
+    // TODO: Construct
+}
+run_test("Classes", test_classes);
+
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "Ran " + test_count + " tests";
 if (failures > 0) {
