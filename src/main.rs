@@ -10,6 +10,7 @@ mod env;
 mod interpreter;
 mod loxvalue;
 mod parser;
+mod resolver;
 mod scanner;
 mod tokens;
 
@@ -156,9 +157,10 @@ fn run(code: &str, allow_exprs: bool, verbose: bool, error_reporter: &errors::Er
     }
 
     let mut parser = parser::Parser::new(tokens.clone().into_iter().collect(), &error_reporter);
-    let mut interpreter = interpreter::Interpreter::new(error_reporter);
-
     let stmts = parser.parse_stmts();
+
+    let mut interpreter = interpreter::Interpreter::new(error_reporter);
+    let resolver = resolver::Resolver::new(&mut interpreter, error_reporter);
 
     if error_reporter.had_error() {
         if allow_exprs {
@@ -166,6 +168,11 @@ fn run(code: &str, allow_exprs: bool, verbose: bool, error_reporter: &errors::Er
             let mut expr_parser =
                 parser::Parser::new(tokens.into_iter().collect(), &error_reporter);
             if let Ok(expr) = expr_parser.parse_expr() {
+                resolver.resolve_expr(&expr);
+                if error_reporter.had_runtime_error() {
+                    error_reporter.print_collected_errors();
+                    return;
+                }
                 interpreter.interpret_expr(&expr);
                 if error_reporter.had_runtime_error() {
                     error_reporter.print_collected_errors();
@@ -188,6 +195,11 @@ fn run(code: &str, allow_exprs: bool, verbose: bool, error_reporter: &errors::Er
         }
     }
 
+    resolver.resolve_stmts(&stmts);
+    if error_reporter.had_runtime_error() {
+        error_reporter.print_collected_errors();
+        return;
+    }
     interpreter.interpret(&stmts);
     if error_reporter.had_runtime_error() {
         error_reporter.print_collected_errors();

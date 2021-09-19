@@ -1,4 +1,6 @@
-use std::{cell::RefCell, convert::TryFrom, rc::Rc, sync::Arc, time::SystemTime};
+use std::{
+    cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc, sync::Arc, time::SystemTime,
+};
 use thiserror::Error;
 
 use crate::{
@@ -10,14 +12,14 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
-pub enum RuntimeError {
+pub enum RuntimeError<'a> {
     // This isn't really an error :-(
     #[error("Breaking out of a loop")]
     Breaking,
 
     // Nor this :-(
     #[error("Returning from function")]
-    Return(LoxValue),
+    Return(LoxValue<'a>),
 
     #[error("Can only call functions and classes")]
     CallOnNonCallable,
@@ -41,12 +43,14 @@ pub enum RuntimeError {
     UndefinedVar(String),
 }
 
-pub struct Interpreter<'a> {
-    env: Rc<RefCell<Environment>>,
+pub struct Interpreter<'a, 'b> {
+    env: Rc<RefCell<Environment<'b>>>,
+    globals: Rc<RefCell<Environment<'b>>>,
+    locals: HashMap<*const Expr, usize>,
     error_reporter: &'a ErrorReporter,
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a, 'b> Interpreter<'a, 'b> {
     pub fn new(error_reporter: &'a ErrorReporter) -> Self {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
 
@@ -64,12 +68,15 @@ impl<'a> Interpreter<'a> {
         );
 
         Interpreter {
-            env: globals,
+            env: globals.clone(),
+            globals,
+            locals: HashMap::new(),
             error_reporter,
         }
     }
 
-    pub fn interpret(&mut self, stmts: &[Stmt]) {
+    pub fn interpret(&mut self, stmts: &'b [Stmt]) {
+        // println!("Locals from resolver: {:?}", self.locals);
         for stmt in stmts {
             let result = self.evaluate_stmt(&stmt);
             if result.is_err() {
@@ -85,7 +92,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn evaluate_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    pub fn evaluate_stmt(&mut self, stmt: &'b Stmt) -> Result<(), RuntimeError<'b>> {
         match stmt {
             Stmt::Block(vec) => {
                 let block_env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
@@ -98,7 +105,7 @@ impl<'a> Interpreter<'a> {
                 Ok(())
             }
             Stmt::Function(stmt) => {
-                let callable = Callable::new_function(stmt.clone(), self.env.clone());
+                let callable = Callable::new_function(&stmt, self.env.clone());
                 self.env
                     .borrow_mut()
                     .define(&stmt.name.lexeme, LoxValue::Callable(callable));
@@ -145,9 +152,9 @@ impl<'a> Interpreter<'a> {
 
     pub fn execute_block(
         &mut self,
-        stmts: &[Stmt],
-        env: Rc<RefCell<Environment>>,
-    ) -> Result<(), RuntimeError> {
+        stmts: &'b [Stmt],
+        env: Rc<RefCell<Environment<'b>>>,
+    ) -> Result<(), RuntimeError<'b>> {
         let previous_env = self.env.clone();
         self.env = env;
         for stmt in stmts {
@@ -161,7 +168,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn evaluate_expr(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn evaluate_expr(&mut self, expr: &Expr) -> Result<LoxValue<'b>, RuntimeError<'b>> {
         match expr {
             Expr::Binary(binary) => {
                 let left = self.evaluate_expr(binary.left.as_ref())?;
@@ -204,17 +211,24 @@ impl<'a> Interpreter<'a> {
                 let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
             }
-            Expr::Variable(token) => self
-                .env
-                .borrow()
-                .get(&token.lexeme)
-                .or_else(|e| self.error(&token, e)),
+            Expr::Variable(token) => self.lookup_variable(token, expr),
             Expr::Assign(assign_expr) => {
                 let value = self.evaluate_expr(assign_expr.value.as_ref())?;
-                self.env
-                    .borrow_mut()
-                    .assign(&assign_expr.name.lexeme, value.clone())
-                    .or_else(|e| self.error(&assign_expr.name, e).map(|_| ()))?;
+                // println!("Lookup for name {} with ptr {:?}", assign_expr.name.lexeme, assign_expr as *const Expr);
+                if let Some(distance) = self.locals.get(&(expr as *const Expr)) {
+                    // println!("Assigning at distance {}", distance);
+                    self.env
+                        .borrow_mut()
+                        .assign_at(*distance, &assign_expr.name.lexeme, value.clone())
+                        .or_else(|e| self.error(&assign_expr.name, e).map(|_| ()))?;
+                } else {
+                    // println!("Assigning global: {}", &assign_expr.name.lexeme);
+                    self.globals
+                        .borrow_mut()
+                        .assign(&assign_expr.name.lexeme, value.clone())
+                        .or_else(|e| self.error(&assign_expr.name, e).map(|_| ()))?;
+                }
+
                 Ok(value)
             }
         }
@@ -225,7 +239,7 @@ impl<'a> Interpreter<'a> {
         left: &Expr,
         op: &Token,
         right: &Expr,
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
         let left_val = self.evaluate_expr(left)?;
         if let TokenType::Or = op.token_type {
             if is_truthy(&left_val) {
@@ -237,7 +251,11 @@ impl<'a> Interpreter<'a> {
         self.evaluate_expr(right)
     }
 
-    fn evaluate_unary(&self, operator: &Token, right: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    fn evaluate_unary(
+        &self,
+        operator: &Token,
+        right: &LoxValue,
+    ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
         match (&operator.token_type, &right) {
             (TokenType::Minus, &LoxValue::Number(n)) => Ok(LoxValue::Number(n * -1.0)),
             (TokenType::Bang, right) => Ok(LoxValue::Boolean(!is_truthy(&right))),
@@ -248,9 +266,9 @@ impl<'a> Interpreter<'a> {
     fn evaluate_binary(
         &self,
         operator: &Token,
-        left: &LoxValue,
-        right: &LoxValue,
-    ) -> Result<LoxValue, RuntimeError> {
+        left: &LoxValue<'b>,
+        right: &LoxValue<'b>,
+    ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
         match (&operator.token_type, &left, &right) {
             (TokenType::Minus, &LoxValue::Number(nl), &LoxValue::Number(nr)) => {
                 Ok(LoxValue::Number(nl - nr))
@@ -312,10 +330,33 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn error(&self, token: &Token, error: RuntimeError) -> Result<LoxValue, RuntimeError> {
+    fn error(
+        &self,
+        token: &Token,
+        error: RuntimeError<'b>,
+    ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
         self.error_reporter
             .runtime_error(token.line, &error.to_string());
         Err(error)
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, distance: usize) {
+        // println!("Resolving expr with ptr {:?} and distance {}", expr as *const Expr, distance);
+        self.locals.insert(expr as *const Expr, distance);
+    }
+
+    fn lookup_variable(
+        &mut self,
+        name: &Token,
+        expr: &Expr,
+    ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
+        // println!("Lookup for name {} with ptr {:?}", name.lexeme, expr as *const Expr);
+        if let Some(distance) = self.locals.get(&(expr as *const Expr)) {
+            self.env.borrow_mut().get_at(*distance, &name.lexeme)
+        } else {
+            // println!("Have too look up global for {}", name.lexeme);
+            self.globals.borrow_mut().get(&name.lexeme)
+        }
     }
 }
 

@@ -8,15 +8,15 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum LoxValue {
+pub enum LoxValue<'a> {
     Nil,
     Boolean(bool),
     Number(f64),
     String(String),
-    Callable(Callable),
+    Callable(Callable<'a>),
 }
 
-impl Display for LoxValue {
+impl<'a> Display for LoxValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LoxValue::Nil => {
@@ -44,13 +44,16 @@ impl Display for LoxValue {
 }
 
 #[derive(Clone, Debug)]
-pub enum Callable {
-    Function(Function),
-    Native(NativeFn),
+pub enum Callable<'a> {
+    Function(Function<'a>),
+    Native(NativeFn<'a>),
 }
 
-impl Callable {
-    pub fn new_function(declaration: FunctionStmt, closure: Rc<RefCell<Environment>>) -> Callable {
+impl<'a> Callable<'a> {
+    pub fn new_function(
+        declaration: &'a FunctionStmt,
+        closure: Rc<RefCell<Environment<'a>>>,
+    ) -> Callable<'a> {
         Callable::Function(Function {
             code: declaration,
             closure,
@@ -59,9 +62,9 @@ impl Callable {
 
     pub fn call(
         &self,
-        interpreter: &mut Interpreter,
-        args: &[LoxValue],
-    ) -> Result<LoxValue, RuntimeError> {
+        interpreter: &mut Interpreter<'_, 'a>,
+        args: &[LoxValue<'a>],
+    ) -> Result<LoxValue<'a>, RuntimeError<'a>> {
         match &self {
             Callable::Native(nfn) => nfn.call(args),
             Callable::Function(Function {
@@ -105,7 +108,7 @@ impl Callable {
     }
 }
 
-impl Display for Callable {
+impl<'a> Display for Callable<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Callable::Function(Function {
@@ -126,19 +129,19 @@ impl Display for Callable {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function {
-    pub code: FunctionStmt,
-    closure: Rc<RefCell<Environment>>,
+pub struct Function<'a> {
+    pub code: &'a FunctionStmt,
+    closure: Rc<RefCell<Environment<'a>>>,
 }
 
 #[derive(Clone)]
-pub struct NativeFn {
+pub struct NativeFn<'a> {
     pub arity: usize,
-    pub code: Arc<dyn Fn(&[LoxValue]) -> Result<LoxValue, RuntimeError>>,
+    pub code: Arc<dyn Fn(&[LoxValue]) -> Result<LoxValue<'a>, RuntimeError<'a>>>,
 }
 
-impl NativeFn {
-    pub fn call(&self, args: &[LoxValue]) -> Result<LoxValue, RuntimeError> {
+impl<'a> NativeFn<'a> {
+    pub fn call(&self, args: &[LoxValue]) -> Result<LoxValue<'a>, RuntimeError<'a>> {
         if args.len() != self.arity {
             return Err(RuntimeError::CallWrongNumberOfArgs);
         }
@@ -146,7 +149,7 @@ impl NativeFn {
     }
 }
 
-impl std::fmt::Debug for NativeFn {
+impl<'a> std::fmt::Debug for NativeFn<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NativeFn")
             .field("arity", &self.arity)
@@ -154,7 +157,7 @@ impl std::fmt::Debug for NativeFn {
     }
 }
 
-impl PartialEq for Callable {
+impl<'a> PartialEq for Callable<'a> {
     // Two native functions are never equal. This might not be right long-term...
     fn eq(&self, _other: &Self) -> bool {
         false
@@ -163,7 +166,7 @@ impl PartialEq for Callable {
 
 pub struct LoxValueError {}
 
-impl TryFrom<&TokenLiteral> for LoxValue {
+impl<'a> TryFrom<&TokenLiteral> for LoxValue<'a> {
     type Error = LoxValueError;
 
     fn try_from(l: &TokenLiteral) -> Result<Self, Self::Error> {

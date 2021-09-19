@@ -46,7 +46,7 @@ fun test_basic_expressions() {
     var result = 1 + (foo * 2);
     assert_eq(7, result);
 }
-run_test("Basic Assertions", test_basic_expressions);
+run_test("Basic Expressions", test_basic_expressions);
 
 fun test_blocks_and_scopes() {
     var foo = 3;
@@ -153,6 +153,19 @@ fun test_closures() {
     assert_eq(3, counter());
 }
 run_test("Closures", test_closures);
+
+fun test_var_resolution() {
+    var a = "outer";
+    {
+        fun get_a() {
+            return a;
+        }
+        assert_eq("outer", get_a());
+        var a = "inner";
+        assert_eq("outer", get_a());
+    }
+}
+run_test("Variable Resolution", test_var_resolution);
 
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "Ran " + test_count + " tests";
