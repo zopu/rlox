@@ -33,8 +33,8 @@ impl<'a> Display for LoxValue<'a> {
             LoxValue::Callable(_) => {
                 f.write_str("(callable)")?;
             }
-            LoxValue::Class(_) => {
-                f.write_str("(class)")?;
+            LoxValue::Class(LoxClass { name }) => {
+                f.write_str(name)?;
             }
             LoxValue::Number(n) => {
                 f.write_fmt(format_args!("{}", n))?;
