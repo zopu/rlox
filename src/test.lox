@@ -177,6 +177,14 @@ fun test_classes() {
     var instance = foo();
     instance.field1 = "f1";
     assert_eq("f1", instance.field1);
+    var ref = instance;
+    assert_eq("f1", ref.field1);
+
+    // Check multiple instances are separate
+    var i2 = foo();
+    i2.field1 = "i2f1";
+    assert_eq("f1", instance.field1);
+    assert_eq("i2f1", i2.field1);
 }
 run_test("Classes", test_classes);
 
