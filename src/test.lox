@@ -174,7 +174,7 @@ fun test_classes() {
             visited = true;
         }
     }
-    // TODO: Construct
+    foo();
 }
 run_test("Classes", test_classes);
 

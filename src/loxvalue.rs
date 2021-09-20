@@ -1,3 +1,4 @@
+use core::panic;
 use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc, sync::Arc};
 
 use crate::{
@@ -13,65 +14,86 @@ pub enum LoxValue<'a> {
     Boolean(bool),
     Number(f64),
     String(String),
-    Callable(Callable<'a>),
-    Class(LoxClass),
+    Ref(Rc<RefCell<LoxRef<'a>>>),
 }
 
 impl<'a> Display for LoxValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoxValue::Nil => {
-                f.write_str("Nil")?;
-            }
+            LoxValue::Nil => f.write_str("Nil"),
             LoxValue::Boolean(b) => {
                 if *b {
-                    f.write_str("true")?;
+                    f.write_str("true")
                 } else {
-                    f.write_str("false")?;
+                    f.write_str("false")
                 }
             }
-            LoxValue::Callable(_) => {
-                f.write_str("(callable)")?;
-            }
-            LoxValue::Class(LoxClass { name }) => {
-                f.write_str(name)?;
-            }
-            LoxValue::Number(n) => {
-                f.write_fmt(format_args!("{}", n))?;
-            }
-            LoxValue::String(s) => {
-                f.write_str(&s)?;
-            }
+            LoxValue::Ref(r) => r.borrow().fmt(f),
+            LoxValue::Number(n) => f.write_fmt(format_args!("{}", n)),
+            LoxValue::String(s) => f.write_str(&s),
         }
-        Ok(())
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum Callable<'a> {
+#[derive(Debug, PartialEq)]
+pub enum LoxRef<'a> {
     Function(Function<'a>),
+    Class(LoxClass),
+    Instance(LoxInstance<'a>),
+}
+
+impl<'a> Display for LoxRef<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoxRef::Function(_) => f.write_str("(function)"),
+            LoxRef::Class(c) => f.write_str(&c.name),
+            LoxRef::Instance(inst) => {
+                f.write_str(&inst.class_name())?;
+                f.write_str(" instance")
+            }
+        }
+    }
+}
+
+pub trait LoxCallable<'a> {
+    fn call(
+        &self,
+        this: Option<Rc<RefCell<LoxRef<'a>>>>,
+        interpreter: &mut Interpreter<'_, 'a>,
+        args: &[LoxValue<'a>],
+    ) -> Result<LoxValue<'a>, RuntimeError<'a>>;
+
+    fn arity(&self) -> usize;
+}
+
+#[derive(Clone, Debug)]
+pub enum Function<'a> {
+    UserDefined(UserFunction<'a>),
     Native(NativeFn<'a>),
 }
 
-impl<'a> Callable<'a> {
+impl<'a> Function<'a> {
     pub fn new_function(
         declaration: &'a FunctionStmt,
         closure: Rc<RefCell<Environment<'a>>>,
-    ) -> Callable<'a> {
-        Callable::Function(Function {
+    ) -> Function<'a> {
+        Function::UserDefined(UserFunction {
             code: declaration,
             closure,
         })
     }
+}
 
-    pub fn call(
+impl<'a> LoxCallable<'a> for Function<'a> {
+    fn call(
         &self,
+        _this: Option<Rc<RefCell<LoxRef<'a>>>>,
         interpreter: &mut Interpreter<'_, 'a>,
         args: &[LoxValue<'a>],
     ) -> Result<LoxValue<'a>, RuntimeError<'a>> {
         match &self {
-            Callable::Native(nfn) => nfn.call(args),
-            Callable::Function(Function {
+            Function::Native(nfn) => nfn.call(args),
+            Function::UserDefined(UserFunction {
                 code:
                     FunctionStmt {
                         name: _,
@@ -96,10 +118,10 @@ impl<'a> Callable<'a> {
         }
     }
 
-    pub fn arity(&self) -> usize {
+    fn arity(&self) -> usize {
         match &self {
-            Callable::Native(nfn) => nfn.arity,
-            Callable::Function(Function {
+            Function::Native(nfn) => nfn.arity,
+            Function::UserDefined(UserFunction {
                 code:
                     FunctionStmt {
                         name: _,
@@ -112,10 +134,10 @@ impl<'a> Callable<'a> {
     }
 }
 
-impl<'a> Display for Callable<'a> {
+impl<'a> Display for Function<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Callable::Function(Function {
+            Function::UserDefined(UserFunction {
                 code:
                     FunctionStmt {
                         name,
@@ -127,13 +149,13 @@ impl<'a> Display for Callable<'a> {
                 f.write_str("fun ")?;
                 f.write_str(&name.lexeme)
             }
-            Callable::Native(_) => f.write_str("<builtin function>"),
+            Function::Native(_) => f.write_str("<builtin function>"),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct Function<'a> {
+pub struct UserFunction<'a> {
     pub code: &'a FunctionStmt,
     closure: Rc<RefCell<Environment<'a>>>,
 }
@@ -161,7 +183,7 @@ impl<'a> std::fmt::Debug for NativeFn<'a> {
     }
 }
 
-impl<'a> PartialEq for Callable<'a> {
+impl<'a> PartialEq for Function<'a> {
     // Two native functions are never equal. This might not be right long-term...
     fn eq(&self, _other: &Self) -> bool {
         false
@@ -178,6 +200,48 @@ impl LoxClass {
         LoxClass { name }
     }
 }
+
+impl<'a> LoxCallable<'a> for LoxClass {
+    fn call(
+        &self,
+        this: Option<Rc<RefCell<LoxRef<'a>>>>,
+        _interpreter: &mut Interpreter<'_, 'a>,
+        _args: &[LoxValue<'a>],
+    ) -> Result<LoxValue<'a>, RuntimeError<'a>> {
+        if let Some(this) = this {
+            if let LoxRef::Class(_) = *this.borrow() {
+                return Ok(LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Instance(
+                    LoxInstance {
+                        class: this.clone(),
+                    },
+                )))));
+            }
+        }
+        panic!("Should have 'this' when calling a class object");
+    }
+
+    fn arity(&self) -> usize {
+        0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LoxInstance<'a> {
+    // Ugly that we don't strongly type this to LoxClass vs LoxRef here.
+    // That's because we're taking the Rc<RefCell<>> from the LoxValue.
+    class: Rc<RefCell<LoxRef<'a>>>,
+}
+
+impl<'a> LoxInstance<'a> {
+    pub fn class_name(&self) -> String {
+        if let LoxRef::Class(c) = &*self.class.borrow() {
+            c.name.clone()
+        } else {
+            panic!("Instance's class is not a class!");
+        }
+    }
+}
+
 pub struct LoxValueError {}
 
 impl<'a> TryFrom<&TokenLiteral> for LoxValue<'a> {

@@ -7,7 +7,7 @@ use crate::{
     ast::{CallExpr, ClassStmt, Expr, ReturnStmt, Stmt, WhileStmt},
     env::Environment,
     errors::ErrorReporter,
-    loxvalue::{Callable, LoxClass, LoxValue, NativeFn},
+    loxvalue::{Function, LoxCallable, LoxClass, LoxRef, LoxValue, NativeFn},
     tokens::{Token, TokenType},
 };
 
@@ -56,15 +56,17 @@ impl<'a, 'b> Interpreter<'a, 'b> {
 
         globals.borrow_mut().define(
             "clock",
-            LoxValue::Callable(Callable::Native(NativeFn {
-                arity: 0,
-                code: Arc::new(move |_args| -> Result<LoxValue, RuntimeError> {
-                    let time = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap();
-                    Ok(LoxValue::Number(time.as_secs() as f64))
-                }),
-            })),
+            LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(Function::Native(
+                NativeFn {
+                    arity: 0,
+                    code: Arc::new(move |_args| -> Result<LoxValue, RuntimeError> {
+                        let time = SystemTime::now()
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap();
+                        Ok(LoxValue::Number(time.as_secs() as f64))
+                    }),
+                },
+            ))))),
         );
 
         Interpreter {
@@ -104,17 +106,21 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 let mut env = self.env.borrow_mut();
                 env.define(&name.lexeme, LoxValue::Nil);
                 let c = LoxClass::new(name.lexeme.clone());
-                env.assign(&name.lexeme, LoxValue::Class(c))
+                env.assign(
+                    &name.lexeme,
+                    LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Class(c)))),
+                )
             }
             Stmt::Expression(e) => {
                 self.evaluate_expr(e)?;
                 Ok(())
             }
             Stmt::Function(stmt) => {
-                let callable = Callable::new_function(&stmt, self.env.clone());
-                self.env
-                    .borrow_mut()
-                    .define(&stmt.name.lexeme, LoxValue::Callable(callable));
+                let callable = Function::new_function(&stmt, self.env.clone());
+                self.env.borrow_mut().define(
+                    &stmt.name.lexeme,
+                    LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(callable)))),
+                );
                 Ok(())
             }
             Stmt::If(e) => {
@@ -192,18 +198,19 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                     .iter()
                     .map(|a| self.evaluate_expr(a).unwrap_or(LoxValue::Nil))
                     .collect();
-                if let LoxValue::Callable(c) = callee {
-                    if args.len() != c.arity() {
-                        self.error_reporter.runtime_error(
-                            0,
-                            &("Expected ".to_string()
-                                + &c.arity().to_string()
-                                + " arguments but got "
-                                + &args.len().to_string()),
-                        );
-                        return Err(RuntimeError::CallWrongNumberOfArgs);
+                if let LoxValue::Ref(r) = callee {
+                    match &*r.borrow() {
+                        LoxRef::Function(f) => {
+                            let none: Option<Rc<RefCell<LoxRef>>> = None;
+                            self.evaluate_call(none, &args, f)
+                        }
+                        LoxRef::Class(c) => self.evaluate_call(Some(r.clone()), &args, c),
+                        LoxRef::Instance(_) => {
+                            self.error_reporter
+                                .runtime_error(0, &RuntimeError::CallOnNonCallable.to_string());
+                            Err(RuntimeError::CallOnNonCallable)
+                        }
                     }
-                    Ok(c.call(self, &args)?)
                 } else {
                     self.error_reporter
                         .runtime_error(0, &RuntimeError::CallOnNonCallable.to_string());
@@ -238,6 +245,25 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 Ok(value)
             }
         }
+    }
+
+    fn evaluate_call(
+        &mut self,
+        this: Option<Rc<RefCell<LoxRef<'b>>>>,
+        args: &[LoxValue<'b>],
+        callable: &impl LoxCallable<'b>,
+    ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
+        if args.len() != callable.arity() {
+            self.error_reporter.runtime_error(
+                0,
+                &("Expected ".to_string()
+                    + &callable.arity().to_string()
+                    + " arguments but got "
+                    + &args.len().to_string()),
+            );
+            return Err(RuntimeError::CallWrongNumberOfArgs);
+        }
+        callable.call(this, self, &args)
     }
 
     fn evaluate_logical(
