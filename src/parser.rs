@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{
-        AssignExpr, BinaryExpr, CallExpr, ClassStmt, Expr, FunctionStmt, IfStmt, LogicalExpr,
-        ReturnStmt, Stmt, UnaryExpr, VarStmt, WhileStmt,
+        AssignExpr, BinaryExpr, CallExpr, ClassStmt, Expr, FunctionStmt, GetExpr, IfStmt,
+        LogicalExpr, ReturnStmt, SetExpr, Stmt, UnaryExpr, VarStmt, WhileStmt,
     },
     errors::ErrorReporter,
     tokens::{Token, TokenLiteral, TokenType},
@@ -13,6 +13,9 @@ use crate::{
 pub enum ParseError {
     #[error("Break statement outside of a loop")]
     BreakOutsideOfLoop,
+
+    #[error("Expect property name after '.'")]
+    CallExpectPropertyName,
 
     #[error("Expect ')' after arguments")]
     CallRightParenExpected,
@@ -376,13 +379,23 @@ impl<'a> Parser<'a> {
         if self.match_any(&[TokenType::Equal]) {
             let eq_token = self.previous();
             let val = self.assignment()?;
-
-            if let Expr::Variable(name) = expr {
-                return Ok(Expr::Assign(AssignExpr {
-                    name,
-                    value: Box::new(val),
-                }));
+            match expr {
+                Expr::Variable(name) => {
+                    return Ok(Expr::Assign(AssignExpr {
+                        name,
+                        value: Box::new(val),
+                    }));
+                }
+                Expr::Get(GetExpr { name, object }) => {
+                    return Ok(Expr::Set(SetExpr {
+                        object,
+                        name,
+                        value: Box::new(val),
+                    }))
+                }
+                _ => {}
             }
+
             return Err(self.error_at(eq_token, ParseError::InvalidAssignmentTarget));
         }
         Ok(expr)
@@ -494,6 +507,13 @@ impl<'a> Parser<'a> {
         loop {
             if self.match_any(&[TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_any(&[TokenType::Dot]) {
+                let name =
+                    self.consume(TokenType::Identifier, ParseError::CallExpectPropertyName)?;
+                expr = Expr::Get(GetExpr {
+                    name,
+                    object: Box::new(expr),
+                })
             } else {
                 break;
             }

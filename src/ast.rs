@@ -19,9 +19,11 @@ pub enum Expr {
     Assign(AssignExpr),
     Binary(BinaryExpr),
     Call(CallExpr),
+    Get(GetExpr),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Logical(LogicalExpr),
+    Set(SetExpr),
     Unary(UnaryExpr),
     Variable(Token),
 }
@@ -85,10 +87,23 @@ pub struct CallExpr {
 }
 
 #[derive(Clone, Debug)]
+pub struct GetExpr {
+    pub name: Token,
+    pub object: Box<Expr>,
+}
+
+#[derive(Clone, Debug)]
 pub struct LogicalExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SetExpr {
+    pub object: Box<Expr>,
+    pub name: Token,
+    pub value: Box<Expr>,
 }
 
 #[derive(Clone, Debug)]
@@ -185,6 +200,12 @@ impl PrettyPrinter {
                 s.push_str(")");
                 s
             }
+            Expr::Get(GetExpr { name, object }) => {
+                let mut s = self.print_expr(&object);
+                s.push_str(".");
+                s.push_str(&name.lexeme);
+                s
+            }
             Expr::Grouping(b) => {
                 let e = b.as_ref();
                 self.parenthesize("group", &[e])
@@ -198,6 +219,14 @@ impl PrettyPrinter {
                 TokenLiteral::Number(n) => n.to_string(),
             },
             Expr::Logical(e) => self.parenthesize(&e.operator.lexeme, &[&e.left, &e.right]),
+            Expr::Set(e) => {
+                let mut s = self.print_expr(&e.object);
+                s.push_str(".");
+                s.push_str(&e.name.lexeme);
+                s.push_str(" = ");
+                s.push_str(&self.print_expr(&e.value));
+                s
+            }
             Expr::Unary(e) => self.parenthesize(&e.operator.lexeme, &[&e.right]),
             Expr::Variable(token) => token.lexeme.clone(),
         }

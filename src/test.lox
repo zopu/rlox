@@ -174,7 +174,9 @@ fun test_classes() {
             visited = true;
         }
     }
-    foo();
+    var instance = foo();
+    instance.field1 = "f1";
+    assert_eq("f1", instance.field1);
 }
 run_test("Classes", test_classes);
 

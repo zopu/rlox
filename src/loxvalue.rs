@@ -1,5 +1,6 @@
 use core::panic;
-use std::{cell::RefCell, convert::TryFrom, fmt::Display, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt::Display, rc::Rc, sync::Arc};
+use thiserror::Error;
 
 use crate::{
     ast::FunctionStmt,
@@ -211,9 +212,7 @@ impl<'a> LoxCallable<'a> for LoxClass {
         if let Some(this) = this {
             if let LoxRef::Class(_) = *this.borrow() {
                 return Ok(LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Instance(
-                    LoxInstance {
-                        class: this.clone(),
-                    },
+                    LoxInstance::new(this.clone()),
                 )))));
             }
         }
@@ -230,15 +229,39 @@ pub struct LoxInstance<'a> {
     // Ugly that we don't strongly type this to LoxClass vs LoxRef here.
     // That's because we're taking the Rc<RefCell<>> from the LoxValue.
     class: Rc<RefCell<LoxRef<'a>>>,
+    fields: HashMap<String, LoxValue<'a>>,
+}
+
+#[derive(Debug, Error)]
+pub enum LoxInstanceError {
+    #[error("Undefined property")]
+    LookupError(String),
 }
 
 impl<'a> LoxInstance<'a> {
+    pub fn new(class: Rc<RefCell<LoxRef<'a>>>) -> LoxInstance<'a> {
+        LoxInstance {
+            class,
+            fields: HashMap::new(),
+        }
+    }
     pub fn class_name(&self) -> String {
         if let LoxRef::Class(c) = &*self.class.borrow() {
             c.name.clone()
         } else {
             panic!("Instance's class is not a class!");
         }
+    }
+
+    pub fn get(&self, name: &str) -> Result<LoxValue<'a>, LoxInstanceError> {
+        match self.fields.get(name) {
+            Some(val) => Ok(val.clone()),
+            None => Err(LoxInstanceError::LookupError(name.to_string())),
+        }
+    }
+
+    pub fn set(&mut self, name: &str, value: LoxValue<'a>) {
+        self.fields.insert(name.to_string(), value);
     }
 }
 

@@ -1,10 +1,7 @@
 use std::{borrow::Borrow, collections::HashMap};
 
 use crate::{
-    ast::{
-        AssignExpr, BinaryExpr, CallExpr, Expr, FunctionStmt, IfStmt, LogicalExpr, ReturnStmt,
-        Stmt, UnaryExpr, VarStmt, WhileStmt,
-    },
+    ast::{AssignExpr, Expr, FunctionStmt, IfStmt, ReturnStmt, Stmt, VarStmt, WhileStmt},
     errors::ErrorReporter,
     interpreter::Interpreter,
     tokens::{Token, TokenLiteral},
@@ -129,36 +126,31 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 }
                 self.resolve_local(expr, token);
             }
-            Expr::Binary(BinaryExpr {
-                left,
-                operator: _,
-                right,
-            }) => {
-                self.resolve_expr_inner(left.borrow());
-                self.resolve_expr_inner(right.borrow());
+            Expr::Binary(expr) => {
+                self.resolve_expr_inner(expr.left.borrow());
+                self.resolve_expr_inner(expr.right.borrow());
             }
-            Expr::Call(CallExpr {
-                callee,
-                paren: _,
-                arguments,
-            }) => {
-                self.resolve_expr_inner(callee.borrow());
-                for arg in arguments {
+            Expr::Call(expr) => {
+                self.resolve_expr_inner(expr.callee.borrow());
+                for arg in &expr.arguments {
                     self.resolve_expr_inner(arg);
                 }
             }
+            Expr::Get(expr) => {
+                self.resolve_expr_inner(expr.object.borrow());
+            }
             Expr::Grouping(expr) => self.resolve_expr_inner(expr.borrow()),
             Expr::Literal(_) => {}
-            Expr::Logical(LogicalExpr {
-                left,
-                operator: _,
-                right,
-            }) => {
-                self.resolve_expr_inner(left.borrow());
-                self.resolve_expr_inner(right.borrow());
+            Expr::Logical(expr) => {
+                self.resolve_expr_inner(expr.left.borrow());
+                self.resolve_expr_inner(expr.right.borrow());
             }
-            Expr::Unary(UnaryExpr { operator: _, right }) => {
-                self.resolve_expr_inner(right.borrow());
+            Expr::Set(expr) => {
+                self.resolve_expr_inner(expr.value.borrow());
+                self.resolve_expr_inner(expr.object.borrow());
+            }
+            Expr::Unary(expr) => {
+                self.resolve_expr_inner(expr.right.borrow());
             }
         }
     }

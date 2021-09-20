@@ -4,7 +4,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    ast::{CallExpr, ClassStmt, Expr, ReturnStmt, Stmt, WhileStmt},
+    ast::{CallExpr, ClassStmt, Expr, GetExpr, ReturnStmt, Stmt, WhileStmt},
     env::Environment,
     errors::ErrorReporter,
     loxvalue::{Function, LoxCallable, LoxClass, LoxRef, LoxValue, NativeFn},
@@ -27,11 +27,17 @@ pub enum RuntimeError<'a> {
     #[error("Wrong number of function arguments")]
     CallWrongNumberOfArgs,
 
+    #[error("Only instances have fields")]
+    FieldAccessOnNonInstance,
+
     #[error("Operands must be numbers")]
     OperandsMustBeNumbers,
 
     #[error("Operands for '+' must be numbers, or first operand must be a string")]
     PlusOperandsWrong,
+
+    #[error("Undefined property")]
+    UndefinedProperty(String),
 
     #[error("Unsupported operation")]
     UnsupportedOperation,
@@ -217,9 +223,32 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                     Err(RuntimeError::CallOnNonCallable)
                 }
             }
+            Expr::Get(GetExpr { name, object }) => {
+                let object = self.evaluate_expr(object)?;
+                if let LoxValue::Ref(r) = &object {
+                    if let LoxRef::Instance(i) = &*r.borrow() {
+                        return i
+                            .get(&name.lexeme)
+                            .map_err(|_| RuntimeError::UndefinedProperty(name.lexeme.clone()));
+                    }
+                }
+                Err(RuntimeError::FieldAccessOnNonInstance)
+            }
             Expr::Grouping(e) => self.evaluate_expr(e.as_ref()),
             Expr::Literal(l) => Ok(LoxValue::try_from(l).unwrap_or(LoxValue::Nil)),
             Expr::Logical(e) => self.evaluate_logical(&e.left, &e.operator, &e.right),
+            Expr::Set(e) => {
+                let val = self.evaluate_expr(&*e.object)?;
+                if let LoxValue::Ref(r) = val {
+                    if let LoxRef::Instance(ref mut i) = &mut *r.borrow_mut() {
+                        let val = self.evaluate_expr(&*e.value)?;
+                        i.set(&e.name.lexeme, val.clone());
+                        return Ok(val);
+                    }
+                }
+
+                Err(RuntimeError::FieldAccessOnNonInstance)
+            }
             Expr::Unary(unary) => {
                 let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
