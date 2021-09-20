@@ -11,6 +11,7 @@ use crate::{
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver<'a, 'b, 'c> {
@@ -61,6 +62,9 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
             }
             Stmt::Class(stmt) => {
                 self.declare(&stmt.name.lexeme);
+                for method in &stmt.methods {
+                    self.resolve_function(method, FunctionType::Method)
+                }
                 self.define(&stmt.name.lexeme);
             }
             Stmt::Function(stmt) => {

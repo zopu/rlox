@@ -168,7 +168,6 @@ fun test_var_resolution() {
 run_test("Variable Resolution", test_var_resolution);
 
 fun test_classes() {
-    var visited = false;
     class foo {
         bar() {
             visited = true;
@@ -187,6 +186,21 @@ fun test_classes() {
     assert_eq("i2f1", i2.field1);
 }
 run_test("Classes", test_classes);
+
+fun test_methods() {
+    var visited = false;
+    class Foo {
+        bar() {
+            visited = true;
+            return 3;
+        }
+    }
+    var foo = Foo();
+    var result = foo.bar();
+    assert_eq(true, visited);
+    assert_eq(3, foo.bar());
+}
+run_test("Methods", test_methods);
 
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "Ran " + test_count + " tests";

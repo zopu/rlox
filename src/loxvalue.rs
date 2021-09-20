@@ -39,7 +39,7 @@ impl<'a> Display for LoxValue<'a> {
 #[derive(Debug, PartialEq)]
 pub enum LoxRef<'a> {
     Function(Function<'a>),
-    Class(LoxClass),
+    Class(LoxClass<'a>),
     Instance(LoxInstance<'a>),
 }
 
@@ -192,17 +192,23 @@ impl<'a> PartialEq for Function<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct LoxClass {
+pub struct LoxClass<'a> {
     name: String,
+    methods: HashMap<String, LoxValue<'a>>,
 }
 
-impl LoxClass {
-    pub fn new(name: String) -> LoxClass {
-        LoxClass { name }
+impl<'a> LoxClass<'a> {
+    // NB probably should be safer and assert that all these LoxValues are actually functions here.
+    pub fn new(name: String, methods: HashMap<String, LoxValue<'a>>) -> LoxClass {
+        LoxClass { name, methods }
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<LoxValue<'a>> {
+        self.methods.get(name).cloned()
     }
 }
 
-impl<'a> LoxCallable<'a> for LoxClass {
+impl<'a> LoxCallable<'a> for LoxClass<'a> {
     fn call(
         &self,
         this: Option<Rc<RefCell<LoxRef<'a>>>>,
@@ -253,11 +259,18 @@ impl<'a> LoxInstance<'a> {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<LoxValue<'a>, LoxInstanceError> {
-        match self.fields.get(name) {
-            Some(val) => Ok(val.clone()),
-            None => Err(LoxInstanceError::LookupError(name.to_string())),
+    pub fn get<'b>(&self, name: &'b str) -> Result<LoxValue<'a>, LoxInstanceError> {
+        if let Some(val) = self.fields.get(name) {
+            return Ok(val.clone());
         }
+
+        if let LoxRef::Class(c) = &*self.class.borrow() {
+            if let Some(mthd) = c.find_method(name) {
+                return Ok(mthd.clone());
+            }
+        }
+
+        Err(LoxInstanceError::LookupError(name.to_string()))
     }
 
     pub fn set(&mut self, name: &str, value: LoxValue<'a>) {

@@ -108,10 +108,16 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Breaking),
-            Stmt::Class(ClassStmt { name, methods: _ }) => {
+            Stmt::Class(ClassStmt { name, methods }) => {
                 let mut env = self.env.borrow_mut();
                 env.define(&name.lexeme, LoxValue::Nil);
-                let c = LoxClass::new(name.lexeme.clone());
+                let mut methods_map = HashMap::new();
+                for method in methods {
+                    let f = Function::new_function(method, self.env.clone());
+                    let f_ref = LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(f))));
+                    methods_map.insert(method.name.lexeme.clone(), f_ref);
+                }
+                let c = LoxClass::new(name.lexeme.clone(), methods_map);
                 env.assign(
                     &name.lexeme,
                     LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Class(c)))),

@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
         let stmt_result = if self.match_any(&[TokenType::Class]) {
             self.class_declaration()
         } else if self.match_any(&[TokenType::Fun]) {
-            self.function()
+            Ok(Stmt::Function(self.function()?))
         } else if self.match_any(&[TokenType::Var]) {
             self.var_declaration()
         } else {
@@ -151,13 +151,10 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::RightBrace, ParseError::ClassExpectRightBrace)?;
 
-        Ok(Stmt::Class(ClassStmt {
-            name,
-            methods: vec![],
-        }))
+        Ok(Stmt::Class(ClassStmt { name, methods }))
     }
 
-    fn function(&mut self) -> Result<Stmt, ParseError> {
+    fn function(&mut self) -> Result<FunctionStmt, ParseError> {
         let name = self.consume(TokenType::Identifier, ParseError::FunctionExpectIdentifier)?;
         self.consume(TokenType::LeftParen, ParseError::FunctionExpectLeftParen)?;
         let mut params = Vec::<Token>::new();
@@ -177,7 +174,7 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::RightParen, ParseError::FunctionExpectRightParen)?;
         self.consume(TokenType::LeftBrace, ParseError::FunctionExpectBlockOpen)?;
         let body = self.block()?;
-        Ok(Stmt::Function(FunctionStmt { name, params, body }))
+        Ok(FunctionStmt { name, params, body })
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
