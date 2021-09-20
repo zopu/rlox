@@ -227,9 +227,10 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 let object = self.evaluate_expr(object)?;
                 if let LoxValue::Ref(r) = &object {
                     if let LoxRef::Instance(i) = &*r.borrow() {
-                        return i
-                            .get(&name.lexeme)
-                            .map_err(|_| RuntimeError::UndefinedProperty(name.lexeme.clone()));
+                        return i.get(&name.lexeme).map_err(|_| {
+                            self.error(&name, RuntimeError::UndefinedProperty(name.lexeme.clone()))
+                                .unwrap_err()
+                        });
                     }
                 }
                 Err(RuntimeError::FieldAccessOnNonInstance)
