@@ -36,7 +36,7 @@ pub enum RuntimeError<'a> {
     #[error("Operands for '+' must be numbers, or first operand must be a string")]
     PlusOperandsWrong,
 
-    #[error("Undefined property")]
+    #[error("Undefined property {0}")]
     UndefinedProperty(String),
 
     #[error("Unsupported operation")]
@@ -45,7 +45,7 @@ pub enum RuntimeError<'a> {
     #[error("Attempted to divide by zero")]
     DivideByZero,
 
-    #[error("Undefined variable")]
+    #[error("Undefined variable {0}")]
     UndefinedVar(String),
 }
 
@@ -233,12 +233,14 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 let object = self.evaluate_expr(object)?;
                 if let LoxValue::Ref(r) = &object {
                     if let LoxRef::Instance(i) = &*r.borrow() {
-                        return i.get(&name.lexeme).map_err(|_| {
+                        return i.get(r.clone(), &name.lexeme).map_err(|_| {
                             self.error(&name, RuntimeError::UndefinedProperty(name.lexeme.clone()))
                                 .unwrap_err()
                         });
                     }
                 }
+                self.error_reporter
+                    .runtime_error(0, &RuntimeError::FieldAccessOnNonInstance.to_string());
                 Err(RuntimeError::FieldAccessOnNonInstance)
             }
             Expr::Grouping(e) => self.evaluate_expr(e.as_ref()),
@@ -254,8 +256,11 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                     }
                 }
 
+                self.error_reporter
+                    .runtime_error(0, &RuntimeError::FieldAccessOnNonInstance.to_string());
                 Err(RuntimeError::FieldAccessOnNonInstance)
             }
+            Expr::This(token) => self.lookup_variable(token, expr),
             Expr::Unary(unary) => {
                 let right = self.evaluate_expr(unary.right.as_ref())?;
                 self.evaluate_unary(&unary.operator, &right)
@@ -420,7 +425,10 @@ impl<'a, 'b> Interpreter<'a, 'b> {
     ) -> Result<LoxValue<'b>, RuntimeError<'b>> {
         // println!("Lookup for name {} with ptr {:?}", name.lexeme, expr as *const Expr);
         if let Some(distance) = self.locals.get(&(expr as *const Expr)) {
-            self.env.borrow_mut().get_at(*distance, &name.lexeme)
+            self.env
+                .borrow_mut()
+                .get_at(*distance, &name.lexeme)
+                .map_err(|e: RuntimeError<'b>| self.error(name, e).unwrap_err())
         } else {
             // println!("Have too look up global for {}", name.lexeme);
             self.globals.borrow_mut().get(&name.lexeme)

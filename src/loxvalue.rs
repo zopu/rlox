@@ -83,6 +83,13 @@ impl<'a> Function<'a> {
             closure,
         })
     }
+
+    pub fn bind(&self, this_ref: Rc<RefCell<LoxRef<'a>>>) -> Function<'a> {
+        match self {
+            Function::UserDefined(f) => Function::UserDefined(f.bind(this_ref)),
+            Function::Native(_) => self.clone(),
+        }
+    }
 }
 
 impl<'a> LoxCallable<'a> for Function<'a> {
@@ -122,15 +129,7 @@ impl<'a> LoxCallable<'a> for Function<'a> {
     fn arity(&self) -> usize {
         match &self {
             Function::Native(nfn) => nfn.arity,
-            Function::UserDefined(UserFunction {
-                code:
-                    FunctionStmt {
-                        name: _,
-                        params,
-                        body: _,
-                    },
-                closure: _,
-            }) => params.len(),
+            Function::UserDefined(f) => f.code.params.len(),
         }
     }
 }
@@ -138,17 +137,9 @@ impl<'a> LoxCallable<'a> for Function<'a> {
 impl<'a> Display for Function<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Function::UserDefined(UserFunction {
-                code:
-                    FunctionStmt {
-                        name,
-                        params: _,
-                        body: _,
-                    },
-                closure: _,
-            }) => {
+            Function::UserDefined(fun) => {
                 f.write_str("fun ")?;
-                f.write_str(&name.lexeme)
+                f.write_str(&fun.code.name.lexeme)
             }
             Function::Native(_) => f.write_str("<builtin function>"),
         }
@@ -159,6 +150,18 @@ impl<'a> Display for Function<'a> {
 pub struct UserFunction<'a> {
     pub code: &'a FunctionStmt,
     closure: Rc<RefCell<Environment<'a>>>,
+}
+
+impl<'a> UserFunction<'a> {
+    pub fn bind(&self, this_ref: Rc<RefCell<LoxRef<'a>>>) -> UserFunction<'a> {
+        let mut new_fun = self.clone();
+        new_fun.closure = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
+        new_fun
+            .closure
+            .borrow_mut()
+            .define("this", LoxValue::Ref(this_ref));
+        new_fun
+    }
 }
 
 #[derive(Clone)]
@@ -259,14 +262,22 @@ impl<'a> LoxInstance<'a> {
         }
     }
 
-    pub fn get<'b>(&self, name: &'b str) -> Result<LoxValue<'a>, LoxInstanceError> {
+    pub fn get<'b>(
+        &self,
+        self_ref: Rc<RefCell<LoxRef<'a>>>,
+        name: &'b str,
+    ) -> Result<LoxValue<'a>, LoxInstanceError> {
         if let Some(val) = self.fields.get(name) {
             return Ok(val.clone());
         }
 
         if let LoxRef::Class(c) = &*self.class.borrow() {
-            if let Some(mthd) = c.find_method(name) {
-                return Ok(mthd.clone());
+            if let Some(LoxValue::Ref(r)) = c.find_method(name) {
+                if let LoxRef::Function(f) = &*r.borrow() {
+                    return Ok(LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(
+                        f.bind(self_ref),
+                    )))));
+                }
             }
         }
 

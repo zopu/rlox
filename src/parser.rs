@@ -554,6 +554,10 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(self.previous().literal));
         }
 
+        if self.match_any(&[TokenType::This]) {
+            return Ok(Expr::This(self.previous()));
+        }
+
         if self.match_any(&[TokenType::Identifier]) {
             return Ok(Expr::Variable(self.previous()));
         }

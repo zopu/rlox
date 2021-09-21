@@ -24,6 +24,7 @@ pub enum Expr {
     Literal(TokenLiteral),
     Logical(LogicalExpr),
     Set(SetExpr),
+    This(Token),
     Unary(UnaryExpr),
     Variable(Token),
 }
@@ -227,6 +228,7 @@ impl PrettyPrinter {
                 s.push_str(&self.print_expr(&e.value));
                 s
             }
+            Expr::This(_) => "this".to_string(),
             Expr::Unary(e) => self.parenthesize(&e.operator.lexeme, &[&e.right]),
             Expr::Variable(token) => token.lexeme.clone(),
         }

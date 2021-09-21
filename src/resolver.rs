@@ -62,10 +62,15 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
             }
             Stmt::Class(stmt) => {
                 self.declare(&stmt.name.lexeme);
+                self.define(&stmt.name.lexeme);
+                self.begin_scope();
+                if let Some(scope) = self.scopes_stack.last_mut() {
+                    scope.insert("this".to_string(), true);
+                }
                 for method in &stmt.methods {
                     self.resolve_function(method, FunctionType::Method)
                 }
-                self.define(&stmt.name.lexeme);
+                self.end_scope();
             }
             Stmt::Function(stmt) => {
                 self.declare(&stmt.name.lexeme);
@@ -152,6 +157,9 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
             Expr::Set(expr) => {
                 self.resolve_expr_inner(expr.value.borrow());
                 self.resolve_expr_inner(expr.object.borrow());
+            }
+            Expr::This(keyword) => {
+                self.resolve_local(expr, keyword);
             }
             Expr::Unary(expr) => {
                 self.resolve_expr_inner(expr.right.borrow());

@@ -202,6 +202,25 @@ fun test_methods() {
 }
 run_test("Methods", test_methods);
 
+fun test_this() {
+    class Foo {
+        set_a(n) {
+            this.a = n;
+        }
+        get_a() {
+            return this.a;
+        }
+    }
+    var foo1 = Foo();
+    foo1.set_a(101);
+    assert_eq(101, foo1.get_a());
+    var foo2 = Foo();
+    foo2.set_a(66);
+    assert_eq(101, foo1.get_a());
+    assert_eq(66, foo2.get_a());
+}
+run_test("'this'", test_this);
+
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "Ran " + test_count + " tests";
 if (failures > 0) {
