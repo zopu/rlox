@@ -304,7 +304,10 @@ impl<'a, 'b> Interpreter<'a, 'b> {
             );
             return Err(RuntimeError::CallWrongNumberOfArgs);
         }
-        callable.call(this, self, &args)
+        callable.call(this, self, &args).map_err(|e| {
+            self.error_reporter.runtime_error(0, &e.to_string());
+            e
+        })
     }
 
     fn evaluate_logical(

@@ -215,20 +215,40 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
     fn call(
         &self,
         this: Option<Rc<RefCell<LoxRef<'a>>>>,
-        _interpreter: &mut Interpreter<'_, 'a>,
-        _args: &[LoxValue<'a>],
+        interpreter: &mut Interpreter<'_, 'a>,
+        args: &[LoxValue<'a>],
     ) -> Result<LoxValue<'a>, RuntimeError<'a>> {
         if let Some(this) = this {
             if let LoxRef::Class(_) = *this.borrow() {
-                return Ok(LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Instance(
-                    LoxInstance::new(this.clone()),
-                )))));
+                let instance_ref = Rc::new(RefCell::new(LoxRef::Instance(LoxInstance::new(
+                    this.clone(),
+                ))));
+                if let Some(loxval) = self.find_method("init") {
+                    if let LoxValue::Ref(r) = loxval {
+                        if let LoxRef::Function(f) = &*r.borrow() {
+                            let bound_f = f.bind(instance_ref.clone());
+                            bound_f.call(Some(this.clone()), interpreter, args)?;
+                            return Ok(LoxValue::Ref(instance_ref));
+                        }
+                    }
+                    panic!("Method is not a function");
+                } else {
+                    return Ok(LoxValue::Ref(instance_ref));
+                }
             }
         }
         panic!("Should have 'this' when calling a class object");
     }
 
     fn arity(&self) -> usize {
+        if let Some(loxval) = self.find_method("init") {
+            if let LoxValue::Ref(r) = loxval {
+                if let LoxRef::Function(f) = &*r.borrow() {
+                    return f.arity();
+                }
+            }
+            panic!("Method is not a function");
+        }
         0
     }
 }

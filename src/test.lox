@@ -221,6 +221,17 @@ fun test_this() {
 }
 run_test("'this'", test_this);
 
+fun test_constructor() {
+    class Foo {
+        init(n) {
+            this.f1 = n;
+        }
+    }
+    var foo = Foo(3);
+    assert_eq(3, foo.f1);
+}
+run_test("Constructors", test_constructor);
+
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "Ran " + test_count + " tests";
 if (failures > 0) {
