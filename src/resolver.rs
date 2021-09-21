@@ -14,11 +14,18 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Clone, Copy)]
+enum ClassType {
+    None,
+    Class,
+}
+
 pub struct Resolver<'a, 'b, 'c> {
     interpreter: &'b mut Interpreter<'a, 'c>,
     error_reporter: &'a ErrorReporter,
     scopes_stack: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
@@ -31,6 +38,7 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
             error_reporter,
             scopes_stack: Vec::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -61,6 +69,8 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 self.end_scope();
             }
             Stmt::Class(stmt) => {
+                let enclosing_class = self.current_class;
+                self.current_class = ClassType::Class;
                 self.declare(&stmt.name.lexeme);
                 self.define(&stmt.name.lexeme);
                 self.begin_scope();
@@ -71,6 +81,7 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                     self.resolve_function(method, FunctionType::Method)
                 }
                 self.end_scope();
+                self.current_class = enclosing_class;
             }
             Stmt::Function(stmt) => {
                 self.declare(&stmt.name.lexeme);
@@ -159,6 +170,10 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 self.resolve_expr_inner(expr.object.borrow());
             }
             Expr::This(keyword) => {
+                if let ClassType::None = self.current_class {
+                    self.error_reporter
+                        .runtime_error(keyword.line, "Can't use 'this' outside of a class");
+                }
                 self.resolve_local(expr, keyword);
             }
             Expr::Unary(expr) => {
