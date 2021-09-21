@@ -113,7 +113,11 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 env.define(&name.lexeme, LoxValue::Nil);
                 let mut methods_map = HashMap::new();
                 for method in methods {
-                    let f = Function::new_function(method, self.env.clone());
+                    let f = Function::new_function(
+                        method,
+                        self.env.clone(),
+                        method.name.lexeme == "init",
+                    );
                     let f_ref = LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(f))));
                     methods_map.insert(method.name.lexeme.clone(), f_ref);
                 }
@@ -128,7 +132,7 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 Ok(())
             }
             Stmt::Function(stmt) => {
-                let callable = Function::new_function(&stmt, self.env.clone());
+                let callable = Function::new_function(&stmt, self.env.clone(), false);
                 self.env.borrow_mut().define(
                     &stmt.name.lexeme,
                     LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(callable)))),

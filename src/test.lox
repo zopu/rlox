@@ -39,7 +39,7 @@ fun run_test(name, fn) {
 
 /* ---- Test infra functions above here ---- */
 
-print "==Running LOX tests==";
+print "==Running LOX Test Suite==";
 
 fun test_basic_expressions() {
     var foo = 3;
@@ -225,14 +225,19 @@ fun test_constructor() {
     class Foo {
         init(n) {
             this.f1 = n;
+            return;
         }
     }
     var foo = Foo(3);
     assert_eq(3, foo.f1);
+    var foo2 = Foo(2);
+    foo2.init(5);
+    assert_eq(5, foo2.f1);
 }
 run_test("Constructors", test_constructor);
 
 /* Summary of ran tests, to check that we actually ran stuff! */
+print "======Tests Complete======";
 print "Ran " + test_count + " tests";
 if (failures > 0) {
     print "Saw " + failures + " failures";

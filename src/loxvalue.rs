@@ -77,10 +77,12 @@ impl<'a> Function<'a> {
     pub fn new_function(
         declaration: &'a FunctionStmt,
         closure: Rc<RefCell<Environment<'a>>>,
+        is_initializer: bool,
     ) -> Function<'a> {
         Function::UserDefined(UserFunction {
             code: declaration,
             closure,
+            is_initializer,
         })
     }
 
@@ -101,28 +103,7 @@ impl<'a> LoxCallable<'a> for Function<'a> {
     ) -> Result<LoxValue<'a>, RuntimeError<'a>> {
         match &self {
             Function::Native(nfn) => nfn.call(args),
-            Function::UserDefined(UserFunction {
-                code:
-                    FunctionStmt {
-                        name: _,
-                        params,
-                        body,
-                    },
-                closure,
-            }) => {
-                let env = Rc::new(RefCell::new(Environment::new(Some(closure.clone()))));
-                if args.len() != params.len() {
-                    return Err(RuntimeError::CallWrongNumberOfArgs);
-                }
-                for i in 0..args.len() {
-                    env.borrow_mut().define(&params[i].lexeme, args[i].clone());
-                }
-                match interpreter.execute_block(body, env) {
-                    Ok(()) => Ok(LoxValue::Nil),
-                    Err(RuntimeError::Return(val)) => Ok(val),
-                    Err(e) => Err(e),
-                }
-            }
+            Function::UserDefined(ufn) => ufn.call(interpreter, args),
         }
     }
 
@@ -150,6 +131,7 @@ impl<'a> Display for Function<'a> {
 pub struct UserFunction<'a> {
     pub code: &'a FunctionStmt,
     closure: Rc<RefCell<Environment<'a>>>,
+    is_initializer: bool,
 }
 
 impl<'a> UserFunction<'a> {
@@ -161,6 +143,36 @@ impl<'a> UserFunction<'a> {
             .borrow_mut()
             .define("this", LoxValue::Ref(this_ref));
         new_fun
+    }
+
+    pub fn call(
+        &self,
+        interpreter: &mut Interpreter<'_, 'a>,
+        args: &[LoxValue<'a>],
+    ) -> Result<LoxValue<'a>, RuntimeError<'a>> {
+        let env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
+        if args.len() != self.code.params.len() {
+            return Err(RuntimeError::CallWrongNumberOfArgs);
+        }
+        for (i, arg) in args.iter().enumerate() {
+            env.borrow_mut()
+                .define(&self.code.params[i].lexeme, arg.clone());
+        }
+        let result = interpreter.execute_block(&self.code.body, env);
+
+        let return_this = || {
+            self.closure
+                .borrow()
+                .get_at(0, "this")
+                .expect("Initializers should have 'this' defined")
+        };
+        match (result, self.is_initializer) {
+            (Err(RuntimeError::Return(val)), false) => Ok(val),
+            (Ok(()), false) => Ok(LoxValue::Nil),
+            (Ok(()), true) => Ok(return_this()),
+            (Err(RuntimeError::Return(_)), true) => Ok(return_this()),
+            (Err(e), _) => Err(e),
+        }
     }
 }
 

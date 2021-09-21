@@ -7,10 +7,11 @@ use crate::{
     tokens::{Token, TokenLiteral},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum FunctionType {
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -78,7 +79,12 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                     scope.insert("this".to_string(), true);
                 }
                 for method in &stmt.methods {
-                    self.resolve_function(method, FunctionType::Method)
+                    let ftype = if method.name.lexeme == "init" {
+                        FunctionType::Initializer
+                    } else {
+                        FunctionType::Method
+                    };
+                    self.resolve_function(method, ftype)
                 }
                 self.end_scope();
                 self.current_class = enclosing_class;
@@ -115,12 +121,19 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 }
             }
             Stmt::Print(expr) => self.resolve_expr_inner(expr),
-            Stmt::Return(ReturnStmt { keyword: _, value }) => {
+            Stmt::Return(ReturnStmt { keyword, value }) => {
                 if let FunctionType::None = self.current_function {
                     self.error_reporter
-                        .runtime_error(0, "Can't return from top-level code");
+                        .runtime_error(keyword.line, "Can't return from top-level code");
                 }
-                self.resolve_expr_inner(value.borrow());
+                if let Expr::Literal(TokenLiteral::Nil) = value.borrow() {
+                } else {
+                    if let FunctionType::Initializer = self.current_function {
+                        self.error_reporter
+                            .runtime_error(keyword.line, "Can't return from an initializer");
+                    }
+                    self.resolve_expr_inner(value.borrow());
+                }
             }
             Stmt::While(WhileStmt { condition, body }) => {
                 self.resolve_expr_inner(condition.borrow());
