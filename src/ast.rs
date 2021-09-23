@@ -32,6 +32,9 @@ pub enum Expr {
 #[derive(Clone, Debug)]
 pub struct ClassStmt {
     pub name: Token,
+
+    // Superclass will only ever be parsed as an Expr::Variable
+    pub superclass: Option<Expr>,
     pub methods: Vec<FunctionStmt>,
 }
 
@@ -126,9 +129,18 @@ impl PrettyPrinter {
                 s
             }
             Stmt::Break => "break;".to_string(),
-            Stmt::Class(ClassStmt { name, methods }) => {
+            Stmt::Class(ClassStmt {
+                name,
+                superclass,
+                methods,
+            }) => {
                 let mut s = "class ".to_string();
                 s.push_str(&name.lexeme);
+                if let Some(Expr::Variable(token)) = superclass {
+                    s.push_str(" < ");
+                    s.push_str(&token.lexeme);
+                    s.push_str(" ");
+                }
                 s.push_str(" { ");
                 for m in methods {
                     s.push_str(&self.print_function_stmt(m));

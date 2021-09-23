@@ -209,17 +209,34 @@ impl<'a> PartialEq for Function<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct LoxClass<'a> {
     name: String,
+    superclass: Option<LoxValue<'a>>,
     methods: HashMap<String, LoxValue<'a>>,
 }
 
 impl<'a> LoxClass<'a> {
-    // NB probably should be safer and assert that all these LoxValues are actually functions here.
-    pub fn new(name: String, methods: HashMap<String, LoxValue<'a>>) -> LoxClass {
-        LoxClass { name, methods }
+    // NB probably should be safer and assert that all these LoxValues are actually functions/classes here.
+    pub fn new(
+        name: String,
+        superclass: Option<LoxValue<'a>>,
+        methods: HashMap<String, LoxValue<'a>>,
+    ) -> LoxClass<'a> {
+        LoxClass {
+            name,
+            superclass,
+            methods,
+        }
     }
 
     pub fn find_method(&self, name: &str) -> Option<LoxValue<'a>> {
-        self.methods.get(name).cloned()
+        if let Some(mthd) = self.methods.get(name) {
+            return Some(mthd.clone());
+        }
+        if let Some(LoxValue::Ref(r)) = &self.superclass {
+            if let LoxRef::Class(sc) = &*r.borrow() {
+                return sc.find_method(name);
+            }
+        }
+        None
     }
 }
 

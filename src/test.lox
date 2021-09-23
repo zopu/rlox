@@ -236,6 +236,19 @@ fun test_constructor() {
 }
 run_test("Constructors", test_constructor);
 
+fun test_inheritance() {
+    class Parent {
+        foo() {
+            return 42;
+        }
+    }
+    class Child < Parent {
+    }
+    var child = Child();
+    assert_eq(42, child.foo());
+}
+run_test("Inheritance", test_inheritance);
+
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "======Tests Complete======";
 print "Ran " + test_count + " tests";

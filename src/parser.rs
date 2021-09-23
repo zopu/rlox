@@ -32,6 +32,9 @@ pub enum ParseError {
     #[error("Expect '}}' after class definition")]
     ClassExpectRightBrace,
 
+    #[error("Expect superclass name")]
+    ClassExpectSuperClass,
+
     #[error("Expect ':' in ternary operator")]
     ColonExpectedInTernary,
 
@@ -142,6 +145,14 @@ impl<'a> Parser<'a> {
 
     fn class_declaration(&mut self) -> Result<Stmt, ParseError> {
         let name = self.consume(TokenType::Identifier, ParseError::ClassExpectIdentifier)?;
+
+        let superclass = if self.match_any(&[TokenType::Less]) {
+            self.consume(TokenType::Identifier, ParseError::ClassExpectSuperClass)?;
+            Some(Expr::Variable(self.previous()))
+        } else {
+            None
+        };
+
         self.consume(TokenType::LeftBrace, ParseError::ClassExpectLeftBrace)?;
 
         let mut methods = Vec::new();
@@ -151,7 +162,11 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::RightBrace, ParseError::ClassExpectRightBrace)?;
 
-        Ok(Stmt::Class(ClassStmt { name, methods }))
+        Ok(Stmt::Class(ClassStmt {
+            name,
+            superclass,
+            methods,
+        }))
     }
 
     fn function(&mut self) -> Result<FunctionStmt, ParseError> {

@@ -36,6 +36,9 @@ pub enum RuntimeError<'a> {
     #[error("Operands for '+' must be numbers, or first operand must be a string")]
     PlusOperandsWrong,
 
+    #[error("Superclass must be a class")]
+    SuperclassMustBeAClass,
+
     #[error("Undefined property {0}")]
     UndefinedProperty(String),
 
@@ -108,7 +111,30 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Breaking),
-            Stmt::Class(ClassStmt { name, methods }) => {
+            Stmt::Class(ClassStmt {
+                name,
+                superclass,
+                methods,
+            }) => {
+                let mut superclass_evaled = None;
+                if let Some(expr) = superclass {
+                    let sc = self.evaluate_expr(expr)?;
+                    let mut is_class = true;
+                    if let LoxValue::Ref(r) = &sc {
+                        if !matches!(&*r.borrow(), LoxRef::Class(_)) {
+                            is_class = false;
+                        }
+                    } else {
+                        is_class = false;
+                    }
+                    if !is_class {
+                        return Err(self
+                            .error(name, RuntimeError::SuperclassMustBeAClass)
+                            .unwrap_err());
+                    }
+                    superclass_evaled = Some(sc);
+                }
+
                 let mut env = self.env.borrow_mut();
                 env.define(&name.lexeme, LoxValue::Nil);
                 let mut methods_map = HashMap::new();
@@ -121,7 +147,7 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                     let f_ref = LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(f))));
                     methods_map.insert(method.name.lexeme.clone(), f_ref);
                 }
-                let c = LoxClass::new(name.lexeme.clone(), methods_map);
+                let c = LoxClass::new(name.lexeme.clone(), superclass_evaled, methods_map);
                 env.assign(
                     &name.lexeme,
                     LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Class(c)))),

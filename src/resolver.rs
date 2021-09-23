@@ -74,6 +74,17 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 self.current_class = ClassType::Class;
                 self.declare(&stmt.name.lexeme);
                 self.define(&stmt.name.lexeme);
+
+                if let Some(expr) = &stmt.superclass {
+                    if let Expr::Variable(sc_token) = expr {
+                        if stmt.name.lexeme == sc_token.lexeme {
+                            self.error_reporter
+                                .runtime_error(sc_token.line, "A class can't inherit from itself");
+                        }
+                    }
+                    self.resolve_expr_inner(&expr);
+                }
+
                 self.begin_scope();
                 if let Some(scope) = self.scopes_stack.last_mut() {
                     scope.insert("this".to_string(), true);
