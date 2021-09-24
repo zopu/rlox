@@ -75,6 +75,7 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                 self.declare(&stmt.name.lexeme);
                 self.define(&stmt.name.lexeme);
 
+                let mut has_superclass = false;
                 if let Some(expr) = &stmt.superclass {
                     if let Expr::Variable(sc_token) = expr {
                         if stmt.name.lexeme == sc_token.lexeme {
@@ -83,6 +84,15 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                         }
                     }
                     self.resolve_expr_inner(&expr);
+                    has_superclass = true;
+                }
+
+                if has_superclass {
+                    self.begin_scope();
+                    self.scopes_stack
+                        .last_mut()
+                        .unwrap()
+                        .insert("super".to_string(), true);
                 }
 
                 self.begin_scope();
@@ -98,6 +108,9 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
                     self.resolve_function(method, ftype)
                 }
                 self.end_scope();
+                if has_superclass {
+                    self.end_scope();
+                }
                 self.current_class = enclosing_class;
             }
             Stmt::Function(stmt) => {
@@ -192,6 +205,9 @@ impl<'a, 'b, 'c> Resolver<'a, 'b, 'c> {
             Expr::Set(expr) => {
                 self.resolve_expr_inner(expr.value.borrow());
                 self.resolve_expr_inner(expr.object.borrow());
+            }
+            Expr::Super(sexpr) => {
+                self.resolve_local(expr, &sexpr.keyword);
             }
             Expr::This(keyword) => {
                 if let ClassType::None = self.current_class {

@@ -4,7 +4,7 @@ use crate::tokens::{Token, TokenLiteral};
 pub enum Stmt {
     Block(Vec<Stmt>),
     Break,
-    Class(ClassStmt),
+    Class(Box<ClassStmt>),
     Expression(Expr),
     Function(FunctionStmt),
     If(IfStmt),
@@ -24,6 +24,7 @@ pub enum Expr {
     Literal(TokenLiteral),
     Logical(LogicalExpr),
     Set(SetExpr),
+    Super(SuperExpr),
     This(Token),
     Unary(UnaryExpr),
     Variable(Token),
@@ -111,6 +112,12 @@ pub struct SetExpr {
 }
 
 #[derive(Clone, Debug)]
+pub struct SuperExpr {
+    pub keyword: Token,
+    pub method: Token,
+}
+
+#[derive(Clone, Debug)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub right: Box<Expr>,
@@ -129,20 +136,16 @@ impl PrettyPrinter {
                 s
             }
             Stmt::Break => "break;".to_string(),
-            Stmt::Class(ClassStmt {
-                name,
-                superclass,
-                methods,
-            }) => {
+            Stmt::Class(class) => {
                 let mut s = "class ".to_string();
-                s.push_str(&name.lexeme);
-                if let Some(Expr::Variable(token)) = superclass {
+                s.push_str(&class.name.lexeme);
+                if let Some(Expr::Variable(token)) = &class.superclass {
                     s.push_str(" < ");
                     s.push_str(&token.lexeme);
                     s.push_str(" ");
                 }
                 s.push_str(" { ");
-                for m in methods {
+                for m in &class.methods {
                     s.push_str(&self.print_function_stmt(m));
                 }
                 s.push_str(" } ");
@@ -238,6 +241,12 @@ impl PrettyPrinter {
                 s.push_str(&e.name.lexeme);
                 s.push_str(" = ");
                 s.push_str(&self.print_expr(&e.value));
+                s
+            }
+            Expr::Super(e) => {
+                let mut s = e.keyword.lexeme.clone();
+                s.push_str(".");
+                s.push_str(&e.method.lexeme);
                 s
             }
             Expr::This(_) => "this".to_string(),

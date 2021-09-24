@@ -4,7 +4,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    ast::{CallExpr, ClassStmt, Expr, GetExpr, ReturnStmt, Stmt, WhileStmt},
+    ast::{CallExpr, Expr, GetExpr, ReturnStmt, Stmt, WhileStmt},
     env::Environment,
     errors::ErrorReporter,
     loxvalue::{Function, LoxCallable, LoxClass, LoxRef, LoxValue, NativeFn},
@@ -111,14 +111,15 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Breaking),
-            Stmt::Class(ClassStmt {
-                name,
-                superclass,
-                methods,
-            }) => {
+            Stmt::Class(class) => {
+                {
+                    let mut env = self.env.borrow_mut();
+                    env.define(&class.name.lexeme, LoxValue::Nil);
+                }
+
                 let mut superclass_evaled = None;
-                if let Some(expr) = superclass {
-                    let sc = self.evaluate_expr(expr)?;
+                if let Some(expr) = &class.superclass {
+                    let sc = self.evaluate_expr(&expr)?;
                     let mut is_class = true;
                     if let LoxValue::Ref(r) = &sc {
                         if !matches!(&*r.borrow(), LoxRef::Class(_)) {
@@ -129,16 +130,16 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                     }
                     if !is_class {
                         return Err(self
-                            .error(name, RuntimeError::SuperclassMustBeAClass)
+                            .error(&class.name, RuntimeError::SuperclassMustBeAClass)
                             .unwrap_err());
                     }
-                    superclass_evaled = Some(sc);
+                    superclass_evaled = Some(sc.clone());
+                    self.env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
+                    self.env.borrow_mut().define("super", sc);
                 }
 
-                let mut env = self.env.borrow_mut();
-                env.define(&name.lexeme, LoxValue::Nil);
                 let mut methods_map = HashMap::new();
-                for method in methods {
+                for method in &class.methods {
                     let f = Function::new_function(
                         method,
                         self.env.clone(),
@@ -147,9 +148,16 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                     let f_ref = LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Function(f))));
                     methods_map.insert(method.name.lexeme.clone(), f_ref);
                 }
-                let c = LoxClass::new(name.lexeme.clone(), superclass_evaled, methods_map);
+
+                if superclass_evaled.is_some() {
+                    let env = self.env.borrow().enclosing().unwrap().clone();
+                    self.env = env;
+                }
+
+                let c = LoxClass::new(class.name.lexeme.clone(), superclass_evaled, methods_map);
+                let mut env = self.env.borrow_mut();
                 env.assign(
-                    &name.lexeme,
+                    &class.name.lexeme,
                     LoxValue::Ref(Rc::new(RefCell::new(LoxRef::Class(c)))),
                 )
             }
@@ -289,6 +297,36 @@ impl<'a, 'b> Interpreter<'a, 'b> {
                 self.error_reporter
                     .runtime_error(0, &RuntimeError::FieldAccessOnNonInstance.to_string());
                 Err(RuntimeError::FieldAccessOnNonInstance)
+            }
+            Expr::Super(se) => {
+                let distance = self
+                    .locals
+                    .get(&(expr as *const Expr))
+                    .expect("No distance computed for 'super' keyword");
+                let superclass = self.env.borrow().get_at(*distance, "super")?;
+                let object = self.env.borrow().get_at(distance - 1, "this")?;
+                // method = superclass.findmethod
+                // method.bind(object)
+                if let LoxValue::Ref(r) = superclass {
+                    if let LoxRef::Class(c) = &*r.borrow() {
+                        let mthd = c.find_method(&se.method.lexeme);
+                        if let Some(method) = mthd {
+                            // Now get the actual method function
+                            if let LoxValue::Ref(rm) = method {
+                                if let LoxRef::Function(f) = &*rm.borrow() {
+                                    // Now method.bind(object)
+                                    if let LoxValue::Ref(obj) = object {
+                                        return Ok(LoxValue::Ref(Rc::new(RefCell::new(
+                                            LoxRef::Function(f.bind(obj)),
+                                        ))));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                panic!("'super' and 'this' should both be valid here");
             }
             Expr::This(token) => self.lookup_variable(token, expr),
             Expr::Unary(unary) => {

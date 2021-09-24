@@ -249,6 +249,50 @@ fun test_inheritance() {
 }
 run_test("Inheritance", test_inheritance);
 
+fun test_super() {
+    class Parent {
+        foo() {
+            return 42;
+        }
+    }
+    class Child < Parent {
+        bar() {
+            return super.foo();
+        }
+    }
+    var child = Child();
+    assert_eq(42, child.bar());
+}
+run_test("Super", test_super);
+
+fun test_shadowing() {
+    class Parent {
+        foo() {
+            return 42;
+        }
+    }
+    class Child < Parent {
+        foo() {
+            return 43;
+        }
+    }
+    class Child2 < Parent {
+    }
+    class Child3 < Parent {
+        foo() {
+            return super.foo() + 2;
+        }
+    }
+    var child = Child();
+    assert_eq(43, child.foo());
+    var child2 = Child2();
+    assert_eq(42, child2.foo());
+    var child3 = Child3();
+    assert_eq(44, child3.foo());
+}
+run_test("Shadowing", test_shadowing);
+
+
 /* Summary of ran tests, to check that we actually ran stuff! */
 print "======Tests Complete======";
 print "Ran " + test_count + " tests";

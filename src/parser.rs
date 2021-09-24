@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::{
     ast::{
         AssignExpr, BinaryExpr, CallExpr, ClassStmt, Expr, FunctionStmt, GetExpr, IfStmt,
-        LogicalExpr, ReturnStmt, SetExpr, Stmt, UnaryExpr, VarStmt, WhileStmt,
+        LogicalExpr, ReturnStmt, SetExpr, Stmt, SuperExpr, UnaryExpr, VarStmt, WhileStmt,
     },
     errors::ErrorReporter,
     tokens::{Token, TokenLiteral, TokenType},
@@ -86,6 +86,12 @@ pub enum ParseError {
     #[error("Expect ';' after statement")]
     SemiColonExpected,
 
+    #[error("Expect '.' after super")]
+    SuperExpectDot,
+
+    #[error("Expect superclass method name")]
+    SuperExpectMethodName,
+
     #[error("Expect n name")]
     VariableNameExpected,
 
@@ -162,11 +168,11 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::RightBrace, ParseError::ClassExpectRightBrace)?;
 
-        Ok(Stmt::Class(ClassStmt {
+        Ok(Stmt::Class(Box::new(ClassStmt {
             name,
             superclass,
             methods,
-        }))
+        })))
     }
 
     fn function(&mut self) -> Result<FunctionStmt, ParseError> {
@@ -567,6 +573,13 @@ impl<'a> Parser<'a> {
 
         if self.match_any(&[TokenType::Number, TokenType::String]) {
             return Ok(Expr::Literal(self.previous().literal));
+        }
+
+        if self.match_any(&[TokenType::Super]) {
+            let keyword = self.previous();
+            self.consume(TokenType::Dot, ParseError::SuperExpectDot)?;
+            let method = self.consume(TokenType::Identifier, ParseError::SuperExpectMethodName)?;
+            return Ok(Expr::Super(SuperExpr { keyword, method }));
         }
 
         if self.match_any(&[TokenType::This]) {
